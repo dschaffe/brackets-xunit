@@ -31,7 +31,7 @@ Limitations and Future Enhancements
 ============
 
 * better detection for unit test in the file.  Should the extension look for a regexp in the test code instead of requiring a special marker?
-* Need a way to specify other external libraries to be loaded e.g. the api file.  The script would put these files in <script src=> tags.
+* Need a way to specify other external libraries to be loaded e.g. the api file.  The script would put these files in script src= tags.
 * Should add more unit test frameworks like qunit and also test262
 
 Change Log

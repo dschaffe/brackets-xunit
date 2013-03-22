@@ -118,7 +118,7 @@ define(function (require, exports, module) {
         workingsetMenu.removeMenuItem(JASMINETEST_CMD);
         var type = determineFileType(selectedEntry);
         if (type === "yui") {
-            projectMenu.addMenuItem(YUITEST_CMD, "", Menus.LAST);
+            workingsetMenu.addMenuItem(YUITEST_CMD, "", Menus.LAST);
         } else if (type === "jasmine") {
             workingsetMenu.addMenuItem(JASMINETEST_CMD, "", Menus.LAST);
         }

@@ -82,12 +82,22 @@ define(function (require, exports, module) {
         });
     }
     
+    // determine if a file is a known test type
+    // first look for brackets-xunit: [type], takes precedence
+    // next look for distinguishing clues in the file:
+    //   YUI: 'YUI(' and 'Test.runner.test'
+    //   jasmine: 'describe' and 'it'
+    // todo: unit test this function
     function determineFileType(fileEntry) {
         if (fileEntry) {
             var text = DocumentManager.getCurrentDocument().getText();
             if (text.match(/brackets-xunit:\s*yui/i) !== null) {
                 return "yui";
             } else if (text.match(/brackets-xunit:\s*jasmine/i) !== null) {
+                return "jasmine";
+            } else if (text.match(/YUI\s*\(/) && text.match(/Test\.Runner\.run\s*\(/)) {
+                return "yui"
+            } else if (text.match(/describe\s*\(/) && text.match(/it\s*\(/)) {
                 return "jasmine";
             }
         }

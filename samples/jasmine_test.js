@@ -1,5 +1,3 @@
-/* brackets-xunit: jasmine */
-
 describe("The first suite", function () {
     it("1st testcase should be green", function () {
         expect(true).toBe(true);

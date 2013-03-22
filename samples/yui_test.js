@@ -1,4 +1,3 @@
-/* brackets-xunit: yui */
 YUI({ logInclude: {TestRunner: true }}).use('test', 'test-console', function (Y) {
     'use strict';
     var testCase = new Y.Test.Case({

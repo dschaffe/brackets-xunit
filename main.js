@@ -70,8 +70,22 @@ define(function (require, exports, module) {
         if (entry == null) {
             entry = DocumentManager.getCurrentDocument().file;
         }
+        var dir = entry.fullPath.substring(0,entry.fullPath.lastIndexOf('/')+1);
+        var contents = DocumentManager.getCurrentDocument().getText(),
+            includes = '';
+
+        if (contents.match(/brackets-xunit:\s*includes=/)) {
+            var includestr = contents.match(/brackets-xunit:\s*includes=[A-Za-z0-9,\._\-\/]*/)[0];
+            includestr = includestr.substring(includestr.indexOf('=')+1);
+            var includedata = includestr.split(',');
+            var i;
+            for (i=0 ; i<includedata.length ; i++) {
+                includes = includes + '<script src="'+dir+includedata[i]+'"></script>\n';
+            }
+        }
         var data = { filename : entry.name,
                      title : 'Jasmine test - ' + entry.name,
+                     includes : includes,
                      contents : DocumentManager.getCurrentDocument().getText()
                    };
         var template = require("text!templates/jasmine.html");
@@ -107,7 +121,7 @@ define(function (require, exports, module) {
     CommandManager.register("Run YUI Unit Test", YUITEST_CMD, function () {
         runYUI();
     });
-    CommandManager.register("Run Jasmine Unit Test", JASMINETEST_CMD, function () {
+    CommandManager.register("Run Jasmine xUnit Test", JASMINETEST_CMD, function () {
         runJasmine();
     });
     

@@ -48,10 +48,7 @@ define(function (require, exports, module) {
         QUNITTEST_CMD       = "qunit_cmd",
         projectMenu         = Menus.getContextMenu(Menus.ContextMenuIds.PROJECT_MENU),
         workingsetMenu      = Menus.getContextMenu(Menus.ContextMenuIds.WORKING_SET_MENU),
-        nodeConnection      = null,
-        logPrefix           = "xUnit - ";
-
-    console.log(logPrefix + "Initializng");
+        nodeConnection      = null;
     
     // Execute YUI test
     function runYUI() {
@@ -66,7 +63,6 @@ define(function (require, exports, module) {
                    };
         var template = require("text!templates/yui.html");
         var html = Mustache.render(template, data);
-        console.log(logPrefix + "Launching YUI test");
         var resultWindow = window.open('about:blank', null, 'width=600,height=200');
         resultWindow.document.write(html);
         resultWindow.focus();
@@ -99,7 +95,6 @@ define(function (require, exports, module) {
         var template = require("text!templates/jasmine.html");
         var html = Mustache.render(template, data);
         FileUtils.writeText(jasmineReportEntry, html).done(function () {
-            console.log(logPrefix + "Launching Jasmine test");
             var report = window.open(jasmineReportEntry.fullPath);
             report.focus();
         });
@@ -122,10 +117,9 @@ define(function (require, exports, module) {
                    };
         var template = require("text!templates/qunit.html");
         var html = Mustache.render(template, data);
-        console.log(logPrefix + "Launching QUnit test");
         // write generated test report to file on disk
         FileUtils.writeText(qunitReportEntry, html).done(function () {
-            // launch new window with generated report
+            //launch new window with generated report
             var report = window.open(qunitReportEntry.fullPath);
             report.focus();
         });
@@ -177,7 +171,6 @@ define(function (require, exports, module) {
         projectMenu.removeMenuItem(QUNITTEST_CMD);
         
         var type = determineFileType(selectedEntry);
-        console.log(logPrefix + "Test type: " + type);
         
         if (type === "yui") {
             projectMenu.addMenuItem(YUITEST_CMD, "", Menus.LAST);
@@ -196,7 +189,6 @@ define(function (require, exports, module) {
         workingsetMenu.removeMenuItem(QUNITTEST_CMD);
         
         var type = determineFileType(selectedEntry);
-        console.log(logPrefix + "Test type: " + type);
         
         if (type === "yui") {
             workingsetMenu.addMenuItem(YUITEST_CMD, "", Menus.LAST);

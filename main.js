@@ -40,17 +40,23 @@ define(function (require, exports, module) {
         ProjectManager      = brackets.getModule("project/ProjectManager");
     
     var moduledir           = FileUtils.getNativeModuleDirectoryPath(module),
-        reportEntry         = new NativeFileSystem.FileEntry(moduledir + '/generated/jasmineReport.html'),
+        jasmineReportEntry  = new NativeFileSystem.FileEntry(moduledir + '/generated/jasmineReport.html'),
+        qunitReportEntry    = new NativeFileSystem.FileEntry(moduledir + '/generated/qUnitReport.html'),
         COMMAND_ID          = "BracketsXUnit.BracketsXUnit",
         YUITEST_CMD         = "yuitest_cmd",
         JASMINETEST_CMD     = "jasminetest_cmd",
+        QUNITTEST_CMD       = "qunit_cmd",
         projectMenu         = Menus.getContextMenu(Menus.ContextMenuIds.PROJECT_MENU),
         workingsetMenu      = Menus.getContextMenu(Menus.ContextMenuIds.WORKING_SET_MENU),
-        nodeConnection      = null;
+        nodeConnection      = null,
+        logPrefix           = "xUnit - ";
 
+    console.log(logPrefix + "Initializng");
+    
+    // Execute YUI test
     function runYUI() {
         var entry = ProjectManager.getSelectedItem();
-        if (entry == null) {
+        if (entry === null) {
             entry = DocumentManager.getCurrentDocument().file;
         }
         var data = { filename : entry.name,
@@ -60,26 +66,28 @@ define(function (require, exports, module) {
                    };
         var template = require("text!templates/yui.html");
         var html = Mustache.render(template, data);
+        console.log(logPrefix + "Launching YUI test");
         var resultWindow = window.open('about:blank', null, 'width=600,height=200');
         resultWindow.document.write(html);
         resultWindow.focus();
     }
  
+    // Execute Jasmine test
     function runJasmine() {
         var entry = ProjectManager.getSelectedItem();
-        if (entry == null) {
+        if (entry === null) {
             entry = DocumentManager.getCurrentDocument().file;
         }
-        var dir = entry.fullPath.substring(0,entry.fullPath.lastIndexOf('/')+1);
+        var dir = entry.fullPath.substring(0, entry.fullPath.lastIndexOf('/') + 1);
         var contents = DocumentManager.getCurrentDocument().getText(),
             includes = '';
 
         if (contents.match(/brackets-xunit:\s*includes=/)) {
             var includestr = contents.match(/brackets-xunit:\s*includes=[A-Za-z0-9,\._\-\/]*/)[0];
-            includestr = includestr.substring(includestr.indexOf('=')+1);
+            includestr = includestr.substring(includestr.indexOf('=') + 1);
             var includedata = includestr.split(',');
             var i;
-            for (i=0 ; i<includedata.length ; i++) {
+            for (i = 0; i < includedata.length; i++) {
                 includes = includes + '<script src="'+dir+includedata[i]+'"></script>\n';
             }
         }
@@ -90,8 +98,35 @@ define(function (require, exports, module) {
                    };
         var template = require("text!templates/jasmine.html");
         var html = Mustache.render(template, data);
-        FileUtils.writeText(reportEntry, html).done(function () {
-            var report = window.open(reportEntry.fullPath);
+        FileUtils.writeText(jasmineReportEntry, html).done(function () {
+            console.log(logPrefix + "Launching Jasmine test");
+            var report = window.open(jasmineReportEntry.fullPath);
+            report.focus();
+        });
+    }
+    
+    // Execute QUnit test
+    function runQUnit() {
+        var entry = ProjectManager.getSelectedItem();
+        var f = entry.fullPath;
+        if (entry === null) {
+            entry = DocumentManager.getCurrentDocument();
+            f = entry.fullPath;
+        }
+        var fname = DocumentManager.getCurrentDocument().filename;
+        var data = { filename : entry.name,
+                     title : 'QUnit test - ' + entry.name,
+                     templatedir : moduledir,
+                     contents : DocumentManager.getCurrentDocument().getText(),
+                     testSrcURL: "file://localhost" + f
+                   };
+        var template = require("text!templates/qunit.html");
+        var html = Mustache.render(template, data);
+        console.log(logPrefix + "Launching QUnit test");
+        // write generated test report to file on disk
+        FileUtils.writeText(qunitReportEntry, html).done(function () {
+            // launch new window with generated report
+            var report = window.open(qunitReportEntry.fullPath);
             report.focus();
         });
     }
@@ -101,6 +136,7 @@ define(function (require, exports, module) {
     // next look for distinguishing clues in the file:
     //   YUI: 'YUI(' and 'Test.runner.test'
     //   jasmine: 'describe' and 'it'
+    //   QUnit: 'test()' and 'it()'
     // todo: unit test this function
     function determineFileType(fileEntry) {
         if (fileEntry) {
@@ -109,42 +145,65 @@ define(function (require, exports, module) {
                 return "yui";
             } else if (text.match(/brackets-xunit:\s*jasmine/i) !== null) {
                 return "jasmine";
+            } else if (text.match(/brackets-xunit:\s*qunit/i) !== null) {
+                return "qunit";
             } else if (text.match(/YUI\s*\(/) && text.match(/Test\.Runner\.run\s*\(/)) {
-                return "yui"
+                return "yui";
             } else if (text.match(/describe\s*\(/) && text.match(/it\s*\(/)) {
                 return "jasmine";
+            } else if (text.match(/test\s*\(/) && text.match(/ok\s*\(/)) {
+                return "qunit";
             }
         }
         return "unknown";
     }
     
+    // Register commands as right click menu items
     CommandManager.register("Run YUI Unit Test", YUITEST_CMD, function () {
         runYUI();
     });
     CommandManager.register("Run Jasmine xUnit Test", JASMINETEST_CMD, function () {
         runJasmine();
     });
+    CommandManager.register("Run QUnit xUnit Test", QUNITTEST_CMD, function () {
+        runQUnit();
+    });
     
+    // Determine type of test for selected item in project
     $(projectMenu).on("beforeContextMenuOpen", function (evt) {
         var selectedEntry = ProjectManager.getSelectedItem();
         projectMenu.removeMenuItem(YUITEST_CMD);
         projectMenu.removeMenuItem(JASMINETEST_CMD);
+        projectMenu.removeMenuItem(QUNITTEST_CMD);
+        
         var type = determineFileType(selectedEntry);
+        console.log(logPrefix + "Test type: " + type);
+        
         if (type === "yui") {
             projectMenu.addMenuItem(YUITEST_CMD, "", Menus.LAST);
         } else if (type === "jasmine") {
             projectMenu.addMenuItem(JASMINETEST_CMD, "", Menus.LAST);
+        } else if (type === "qunit") {
+            projectMenu.addMenuItem(QUNITTEST_CMD, "", Menus.LAST);
         }
     });
+    
+    // Determine type of test for selected item in working set
     $(workingsetMenu).on("beforeContextMenuOpen", function (evt) {
         var selectedEntry = DocumentManager.getCurrentDocument().file;
         workingsetMenu.removeMenuItem(YUITEST_CMD);
         workingsetMenu.removeMenuItem(JASMINETEST_CMD);
+        workingsetMenu.removeMenuItem(QUNITTEST_CMD);
+        
         var type = determineFileType(selectedEntry);
+        console.log(logPrefix + "Test type: " + type);
+        
         if (type === "yui") {
             workingsetMenu.addMenuItem(YUITEST_CMD, "", Menus.LAST);
         } else if (type === "jasmine") {
             workingsetMenu.addMenuItem(JASMINETEST_CMD, "", Menus.LAST);
+        } else if (type === "qunit") {
+            workingsetMenu.addMenuItem(QUNITTEST_CMD, "", Menus.LAST);
         }
     });
 

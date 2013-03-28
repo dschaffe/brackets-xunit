@@ -105,7 +105,7 @@ define(function (require, exports, module) {
     function runQUnit() {
         var entry = ProjectManager.getSelectedItem();
         var f = entry.fullPath;
-        if (entry === null) {
+        if (entry === undefined) {
             entry = DocumentManager.getCurrentDocument();
             f = entry.fullPath;
         }

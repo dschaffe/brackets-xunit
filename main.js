@@ -38,7 +38,7 @@ define(function (require, exports, module) {
         NodeConnection      = brackets.getModule("utils/NodeConnection"),
         DocumentManager     = brackets.getModule("document/DocumentManager"),
         ProjectManager      = brackets.getModule("project/ProjectManager");
-    
+
     var moduledir           = FileUtils.getNativeModuleDirectoryPath(module),
         jasmineReportEntry  = new NativeFileSystem.FileEntry(moduledir + '/generated/jasmineReport.html'),
         qunitReportEntry    = new NativeFileSystem.FileEntry(moduledir + '/generated/qUnitReport.html'),
@@ -46,11 +46,11 @@ define(function (require, exports, module) {
         YUITEST_CMD         = "yuitest_cmd",
         JASMINETEST_CMD     = "jasminetest_cmd",
         QUNITTEST_CMD       = "qunit_cmd",
+        TEST262TEST_CMD     = "test262_cmd",
         projectMenu         = Menus.getContextMenu(Menus.ContextMenuIds.PROJECT_MENU),
         workingsetMenu      = Menus.getContextMenu(Menus.ContextMenuIds.WORKING_SET_MENU),
         nodeConnection      = null;
 
-    
     // Execute YUI test
     function runYUI() {
         var entry = ProjectManager.getSelectedItem();
@@ -100,7 +100,7 @@ define(function (require, exports, module) {
             report.focus();
         });
     }
-    
+
     // Execute QUnit test
     function runQUnit() {
         var entry = ProjectManager.getSelectedItem();
@@ -125,13 +125,46 @@ define(function (require, exports, module) {
             report.focus();
         });
     }
-    
+
+    // Execute test262 test
+    function runTest262() {
+        var entry = ProjectManager.getSelectedItem();
+        if (entry === null) {
+            entry = DocumentManager.getCurrentDocument();
+        }
+        var path = entry.fullPath;
+        console.log("running file: " + path);
+    }
+
+    // determine if file is test262
+    // look at file path for a test directory
+    // from the test directory go back one level and look
+    // for existance of tools/packaging/test262.py
+    // parameter: string of the test file name
+    // returns: a deferred object, result will be the base directory from where 
+    //          tools/packaging/test262.py can be added to find the python test runner
+    function determineTest262FileType(path) {
+        if (path.indexOf('/test/') === -1) {
+            return undefined;
+        }
+        var base = path.substring(0, path.lastIndexOf('/test/'));
+        var deferred = $.Deferred();
+        NativeFileSystem.resolveNativeFileSystemPath(base + '/tools/packaging/test262.py', function (entry) {
+            deferred.resolve(base);
+        }, function (err) {
+            deferred.resolve();
+        });
+        return deferred.promise();
+    }
+
     // determine if a file is a known test type
     // first look for brackets-xunit: [type], takes precedence
     // next look for distinguishing clues in the file:
     //   YUI: 'YUI(' and 'Test.runner.test'
     //   jasmine: 'describe' and 'it'
     //   QUnit: 'test()' and 'it()'
+    //   test262: look at path for test directory then check for 
+    //           ../tools/packaging/test262.py
     // todo: unit test this function
     function determineFileType(fileEntry) {
         if (fileEntry) {
@@ -142,6 +175,8 @@ define(function (require, exports, module) {
                 return "jasmine";
             } else if (text.match(/brackets-xunit:\s*qunit/i) !== null) {
                 return "qunit";
+            } else if (text.match(/brackets-xunit:\s*test262/i) !== null) {
+                return "test262";
             } else if (text.match(/YUI\s*\(/) && text.match(/Test\.Runner\.run\s*\(/)) {
                 return "yui";
             } else if (text.match(/describe\s*\(/) && text.match(/it\s*\(/)) {
@@ -152,7 +187,7 @@ define(function (require, exports, module) {
         }
         return "unknown";
     }
-    
+
     // Register commands as right click menu items
     CommandManager.register("Run YUI Unit Test", YUITEST_CMD, function () {
         runYUI();
@@ -163,40 +198,66 @@ define(function (require, exports, module) {
     CommandManager.register("Run QUnit xUnit Test", QUNITTEST_CMD, function () {
         runQUnit();
     });
-    
+    CommandManager.register("Run test262 xUnit Test", TEST262TEST_CMD, function () {
+        runTest262();
+    });
+
     // Determine type of test for selected item in project
     $(projectMenu).on("beforeContextMenuOpen", function (evt) {
         var selectedEntry = ProjectManager.getSelectedItem();
         projectMenu.removeMenuItem(YUITEST_CMD);
         projectMenu.removeMenuItem(JASMINETEST_CMD);
         projectMenu.removeMenuItem(QUNITTEST_CMD);
-        
+        projectMenu.removeMenuItem(TEST262TEST_CMD);
+
         var type = determineFileType(selectedEntry);
-        
         if (type === "yui") {
             projectMenu.addMenuItem(YUITEST_CMD, "", Menus.LAST);
         } else if (type === "jasmine") {
             projectMenu.addMenuItem(JASMINETEST_CMD, "", Menus.LAST);
         } else if (type === "qunit") {
             projectMenu.addMenuItem(QUNITTEST_CMD, "", Menus.LAST);
+        } else if (type === "test262") {
+            projectMenu.addMenuItem(TEST262TEST_CMD, "", Menus.LAST);
+        } else {
+            var promise = determineTest262FileType(selectedEntry.fullPath);
+            if ( promise != undefined ) {
+                promise.done( function(path) {
+                    if (path != undefined) {
+                        projectMenu.addMenuItem(TEST262TEST_CMD, "", Menus.LAST);
+                    }
+                });
+            }
         }
     });
-    
+
     // Determine type of test for selected item in working set
     $(workingsetMenu).on("beforeContextMenuOpen", function (evt) {
         var selectedEntry = DocumentManager.getCurrentDocument().file;
         workingsetMenu.removeMenuItem(YUITEST_CMD);
         workingsetMenu.removeMenuItem(JASMINETEST_CMD);
         workingsetMenu.removeMenuItem(QUNITTEST_CMD);
-        
+        workingsetMenu.removeMenuItem(TEST262TEST_CMD);
+
         var type = determineFileType(selectedEntry);
-        
+
         if (type === "yui") {
             workingsetMenu.addMenuItem(YUITEST_CMD, "", Menus.LAST);
         } else if (type === "jasmine") {
             workingsetMenu.addMenuItem(JASMINETEST_CMD, "", Menus.LAST);
         } else if (type === "qunit") {
             workingsetMenu.addMenuItem(QUNITTEST_CMD, "", Menus.LAST);
+        } else if (type === "test262") {
+            workingsetMenu.addMenuItem(TEST262TEST_CMD, "", Menus.LAST);
+        } else {
+            var promise = determineTest262FileType(selectedEntry.fullPath);
+            if ( promise != undefined ) {
+                promise.done( function(path) {
+                    if (path != undefined) {
+                        workingsetMenu.addMenuItem(TEST262TEST_CMD, "", Menus.LAST);
+                    }
+                });
+            }
         }
     });
 

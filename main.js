@@ -127,9 +127,8 @@ define(function (require, exports, module) {
     }
 
 
-// jasmine-node
-
-    function chain() {
+	// jasmine-node
+	function chain() {
         var functions = Array.prototype.slice.call(arguments, 0);
         if (functions.length > 0) {
             var firstFunction = functions.shift();
@@ -145,7 +144,7 @@ define(function (require, exports, module) {
         function connect() {
             var connectionPromise = nodeConnection.connect(true);
             connectionPromise.fail(function () {
-                console.error("[brackets-jasmine] failed to connect to node");
+                console.error("[brackets-xunit] failed to connect to node");
             });
             return connectionPromise;
         }
@@ -154,7 +153,7 @@ define(function (require, exports, module) {
             var path = ExtensionUtils.getModulePath(module, "node/JasmineDomain");
             var loadPromise = nodeConnection.loadDomains([path], true);
             loadPromise.fail(function () {
-                console.log("[brackets-jasmine] failed to load jasmine domain");
+                console.log("[brackets-xunit] failed to load jasmine domain");
             });
             return loadPromise;
         }
@@ -163,7 +162,7 @@ define(function (require, exports, module) {
             if (jsondata.length > 5 && jsondata.substring(0, 6) === 'Error:') {
                 var dlg = Dialogs.showModalDialog(
                     Dialogs.DIALOG_ID_ERROR,
-                    "Jasmine Error",
+                    "Jasmine Node Error",
                     jsondata.substring(7)
                 );
             } else {
@@ -212,28 +211,37 @@ define(function (require, exports, module) {
     //   YUI: 'YUI(' and 'Test.runner.test'
     //   jasmine: 'describe' and 'it'
     //   QUnit: 'test()' and 'it()'
-	//	 node: look for the jslint option called node and is set to true
-	//   /*jslint node:true */  See http://www.jslint.com/lint.html#options
+	//	 node: '/*jslint node:true */' look for the jslint option called node and that
+	//   it is set to true.  See http://www.jslint.com/lint.html#options
     // todo: unit test this function
     function determineFileType(fileEntry) {
 	
         if (fileEntry) {
-            var text = DocumentManager.getCurrentDocument().getText();
-            if (text.match(/brackets-xunit:\s*yui/i) !== null) {
-                return "yui";
-            } else if (text.match(/brackets-xunit:\s*jasmine/i) !== null) {
-                return "jasmine";
-            } else if (text.match(/node: true/i) && text.match(/describe\s*\(/)) {
-                return "node";
-            } else if (text.match(/brackets-xunit:\s*qunit/i) !== null) {
-                return "qunit";
-            } else if (text.match(/YUI\s*\(/) && text.match(/Test\.Runner\.run\s*\(/)) {
-                return "yui";
-            } else if (text.match(/describe\s*\(/) && text.match(/it\s*\(/)) {
-                return "jasmine";
-            } else if (text.match(/test\s*\(/) && text.match(/ok\s*\(/)) {
-                return "qunit";
-            } 
+            var text = "";
+			var pattern = new RegExp('(spec.js$|\/(spec|specs)\/)', 'i');
+			
+			if (fileEntry && fileEntry.fullPath.match(pattern, 'i') !== null) {
+					return "node";
+			} else {
+				if(!fileEntry.isDirectory){
+					text = DocumentManager.getCurrentDocument().getText();
+					if (text.match(/brackets-xunit:\s*jasmine/i) !== null){
+						return "jasmine";
+					} else if (text.match(/node: true/i) && text.match(/describe\s*\(/)) {
+						return "node";
+					} else if (text.match(/describe\s*\(/) && text.match(/it\s*\(/)) {
+						return "jasmine";
+					} else if (text.match(/brackets-xunit:\s*yui/i) !== null) {
+					return "yui";
+					} else if (text.match(/brackets-xunit:\s*qunit/i) !== null) {
+						return "qunit";
+					} else if (text.match(/YUI\s*\(/) && text.match(/Test\.Runner\.run\s*\(/)) {
+						return "yui";
+					} else if (text.match(/test\s*\(/) && text.match(/ok\s*\(/)) {
+						return "qunit";
+					}
+				}
+			} 
         }
         return "unknown";
     }
@@ -256,7 +264,7 @@ define(function (require, exports, module) {
     // Determine type of test for selected item in project
     $(projectMenu).on("beforeContextMenuOpen", function (evt) {
         var selectedEntry = ProjectManager.getSelectedItem();
-        projectMenu.removeMenuItem(YUITEST_CMD);
+		projectMenu.removeMenuItem(YUITEST_CMD);
         projectMenu.removeMenuItem(JASMINETEST_CMD);
         projectMenu.removeMenuItem(QUNITTEST_CMD);
 		projectMenu.removeMenuItem(NODETEST_CMD);

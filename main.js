@@ -123,15 +123,14 @@ define(function (require, exports, module) {
     function runQUnit() {
         var entry = ProjectManager.getSelectedItem();
         if (entry === undefined) {
-            entry = DocumentManager.getCurrentDocument().file;
+            entry = DocumentManager.getCurrentDocument();
         }
         var f = entry.fullPath;
         var fname = DocumentManager.getCurrentDocument().filename;
         var data = { filename : entry.name,
                      title : 'QUnit test - ' + entry.name,
                      templatedir : moduledir,
-                     contents : DocumentManager.getCurrentDocument().getText(),
-                     testSrcURL: "file://localhost" + f
+                     contents : DocumentManager.getCurrentDocument().getText()
                    };
         var template = require("text!templates/qunit.html");
         var html = Mustache.render(template, data);

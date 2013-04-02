@@ -42,10 +42,13 @@ define(function (require, exports, module) {
     var moduledir           = FileUtils.getNativeModuleDirectoryPath(module),
         jasmineReportEntry  = new NativeFileSystem.FileEntry(moduledir + '/generated/jasmineReport.html'),
         qunitReportEntry    = new NativeFileSystem.FileEntry(moduledir + '/generated/qUnitReport.html'),
+		templateEntry       = new NativeFileSystem.FileEntry(moduledir + '/html/jasmineReportTemplate.html'),
+        reportJasNodeEntry         = new NativeFileSystem.FileEntry(moduledir + '/node/reports/jasmineReport.html'),
         COMMAND_ID          = "BracketsXUnit.BracketsXUnit",
         YUITEST_CMD         = "yuitest_cmd",
         JASMINETEST_CMD     = "jasminetest_cmd",
         QUNITTEST_CMD       = "qunit_cmd",
+		JASNODETEST_CMD     = "jasnodetest_cmd",
         projectMenu         = Menus.getContextMenu(Menus.ContextMenuIds.PROJECT_MENU),
         workingsetMenu      = Menus.getContextMenu(Menus.ContextMenuIds.WORKING_SET_MENU),
         nodeConnection      = null;
@@ -122,7 +125,87 @@ define(function (require, exports, module) {
             report.focus();
         });
     }
+
+
+// jasmine-node
+
+    function chain() {
+        var functions = Array.prototype.slice.call(arguments, 0);
+        if (functions.length > 0) {
+            var firstFunction = functions.shift();
+            var firstPromise = firstFunction.call();
+            firstPromise.done(function () {
+                chain.apply(null, functions);
+            });
+        }
+    }
+
+    AppInit.appReady(function () {
+        nodeConnection = new NodeConnection();
+        function connect() {
+            var connectionPromise = nodeConnection.connect(true);
+            connectionPromise.fail(function () {
+                console.error("[brackets-jasmine] failed to connect to node");
+            });
+            return connectionPromise;
+        }
+
+        function loadJasmineDomain() {
+            var path = ExtensionUtils.getModulePath(module, "node/JasmineDomain");
+            var loadPromise = nodeConnection.loadDomains([path], true);
+            loadPromise.fail(function () {
+                console.log("[brackets-jasmine] failed to load jasmine domain");
+            });
+            return loadPromise;
+        }
+
+        $(nodeConnection).on("jasmine.update", function (evt, jsondata) {
+            if (jsondata.length > 5 && jsondata.substring(0, 6) === 'Error:') {
+                var dlg = Dialogs.showModalDialog(
+                    Dialogs.DIALOG_ID_ERROR,
+                    "Jasmine Error",
+                    jsondata.substring(7)
+                );
+            } else {
+                FileUtils.readAsText(templateEntry).done(function (text, timestamp) {
+                    jsondata = jsondata.replace(/'/g, "");
+                    var data = JSON.parse(jsondata);
+                    var index = text.indexOf("%jsondata%");
+                    text = text.substring(0, index) + jsondata + text.substring(index + 10);
+                    index = text.indexOf("%time%");
+                    var totaltime = 0;
+                    var i;
+                    for (i = 0; i < data.length; i++) {
+                        totaltime = totaltime + parseFloat(data[i].time);
+                    }
+                    text = text.substring(0, index) + totaltime + text.substring(index + 6);
+                    FileUtils.writeText(reportJasNodeEntry, text).done(function () {
+                        window.open(reportJasNodeEntry.fullPath);
+                    });
+                });
+            }
+        });
+
+        chain(connect, loadJasmineDomain);
+    });
     
+	function runJasmineNode() {
+        var entry = ProjectManager.getSelectedItem();
+        if (entry === null) {
+            entry = DocumentManager.getCurrentDocument().file;
+        }
+        var path = entry.fullPath;
+        nodeConnection.domains.jasmine.runTest(path)
+            .fail(function (err) {
+                console.log("[brackets-jasmine] error running file: " + entry.fullPath + " message: " + err.toString());
+                var dlg = Dialogs.showModalDialog(
+                    Dialogs.DIALOG_ID_ERROR,
+                    "Jasmine Error",
+                    "The test file contained an error: " + err.toString()
+                );
+            });
+    }
+	
     // determine if a file is a known test type
     // first look for brackets-xunit: [type], takes precedence
     // next look for distinguishing clues in the file:
@@ -137,6 +220,8 @@ define(function (require, exports, module) {
                 return "yui";
             } else if (text.match(/brackets-xunit:\s*jasmine/i) !== null) {
                 return "jasmine";
+            } else if (text.match(/brackets-xunit:\s*jas-node/i) !== null) {
+                return "jasnode";
             } else if (text.match(/brackets-xunit:\s*qunit/i) !== null) {
                 return "qunit";
             } else if (text.match(/YUI\s*\(/) && text.match(/Test\.Runner\.run\s*\(/)) {
@@ -145,7 +230,7 @@ define(function (require, exports, module) {
                 return "jasmine";
             } else if (text.match(/test\s*\(/) && text.match(/ok\s*\(/)) {
                 return "qunit";
-            }
+            } 
         }
         return "unknown";
     }
@@ -159,6 +244,10 @@ define(function (require, exports, module) {
     });
     CommandManager.register("Run QUnit xUnit Test", QUNITTEST_CMD, function () {
         runQUnit();
+    });
+	
+	CommandManager.register("Run Jasmine-Node xUnit Test", JASNODETEST_CMD, function () {
+        runJasmineNode();
     });
     
     // Determine type of test for selected item in project
@@ -176,6 +265,8 @@ define(function (require, exports, module) {
             projectMenu.addMenuItem(JASMINETEST_CMD, "", Menus.LAST);
         } else if (type === "qunit") {
             projectMenu.addMenuItem(QUNITTEST_CMD, "", Menus.LAST);
+        } else if (type === "jasnode") {
+            projectMenu.addMenuItem(JASNODETEST_CMD, "", Menus.LAST);
         }
     });
     
@@ -185,6 +276,7 @@ define(function (require, exports, module) {
         workingsetMenu.removeMenuItem(YUITEST_CMD);
         workingsetMenu.removeMenuItem(JASMINETEST_CMD);
         workingsetMenu.removeMenuItem(QUNITTEST_CMD);
+		workingsetMenu.removeMenuItem(JASNODETEST_CMD);
         
         var type = determineFileType(selectedEntry);
         
@@ -194,6 +286,8 @@ define(function (require, exports, module) {
             workingsetMenu.addMenuItem(JASMINETEST_CMD, "", Menus.LAST);
         } else if (type === "qunit") {
             workingsetMenu.addMenuItem(QUNITTEST_CMD, "", Menus.LAST);
+        } else if (type === "qunit") {
+            workingsetMenu.addMenuItem(JASNODETEST_CMD, "", Menus.LAST);
         }
     });
 

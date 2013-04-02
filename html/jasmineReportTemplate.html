@@ -1,0 +1,78 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+  "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+  <title>Jasmine Results</title>
+  <link rel="stylesheet" type="text/css" href="../../html/jasmine.css">
+  <script src="http://code.jquery.com/jquery-1.9.1.min.js"></script>
+  <script type="text/javascript">
+     $(document).ready(function() {
+          var jsondata='%jsondata%';
+          var data=JSON.parse(jsondata);
+          if (data.length>0) {
+              document.title="Jasmine Results - "+data[0].title;
+          }
+          //console.log(data);
+          var i,j;
+          var failCount=0;
+          for (i in data) {
+              if (data[i].failures==0 && data[i].errors==0) {
+                  $("#symbols").append('<li class="passed"></li>');
+                  $("#resultsdata").append('<div class="suite passed"><a class="description">'+data[i].name+'</a>');
+                  for (j in data[i].testcases) {
+                    $("#resultsdata").append('<div class="specSummary passed"><a href="#" class="description" title="'+data[i].testcases[j].name+'">'+data[i].testcases[j].name+'</a></div>');
+                  }
+                  $("#resultsdata").append('</div>');
+              } else {
+                  $("#symbols").append('<li class="failed"></li>');
+                  failCount+=1;
+                  $("#resultsdata").append('<div class="suite failed"><a class="description">'+data[i].name+'</a>');
+                  for (j in data[i].testcases) {
+                      if ('failure' in data[i].testcases[j]) {
+                          $("#resultsdata").append('<div class="specSummary failed"><a href="#" class="description" title="'+data[i].testcases[j].name+'">'+data[i].testcases[j].name+' '+data[i].testcases[j].failure+'</a></div>');
+                      } else {
+                          $("#resultsdata").append('<div class="specSummary passed"><a href="#" class="description" title="'+data[i].testcases[j].name+'">'+data[i].testcases[j].name+'</a></div>');
+                      }
+                  }
+                  $("#resultsdata").append('</div>');
+              }
+          }
+          if (failCount==0) {
+              $("#exceptionDiv").append('<span class="passingAlert bar">Passing '+data.length+' specs</span>');
+          } else {
+              $("#exceptionDiv").append('<span class="failingAlert bar">Failing '+failCount+' specs</span>');
+              $("#resultssummary").append('<a class="summaryMenuItem">'+data.length+' specs</a> | <a class="detailsMenuItem">'+failCount+' failing</a>');
+          }
+     });
+  </script>
+</head>
+
+<body>
+  <div id="HTMLReporter" class="jasmine_reporter">
+    <div id="title"></div>
+    <div class="banner">
+      <span class="title">Jasmine</span>
+      <span class="version">1.3.1 revision 1354556913</span>
+      <span class="duration">finished in %time%s</span>
+    </div>
+    <ul class="symbolSummary">
+        <div id="symbols"></div>
+    </ul>
+    <div class="alert">
+      <span class="exceptions">
+        <label class="label" for="no_try_catch">No try/catch</label>
+        <input id="no_try_catch" type="checkbox"></input>
+      </span>
+      <div id="exceptionDiv"></div>
+      <span class="resultsMenu bar">
+          <div id="resultssummary"></div>
+      </span>
+    </div>
+    <div class="results">
+      <div class="summary">
+        <div id="resultsdata"></div>
+      </div>
+    </div>
+   </div>
+</body>
+</html>

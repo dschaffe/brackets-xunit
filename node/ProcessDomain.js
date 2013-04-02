@@ -31,7 +31,7 @@
     var _sessions = {},
         domainManager;
 
-    function spawnSession(command, parameters, directory) {
+    function spawnSession(command, parameters, directory, shell) {
         if (parameters === undefined) {
             parameters = [];
         }
@@ -54,8 +54,9 @@
         });
     
         _sessions[session.pid] = session;
-    
-        return session.pid;
+        var cmds = [command];
+        cmds = cmds.concat(parameters);
+        return [session.pid, cmds, shell];
     }
     
     function killSession(pid) {

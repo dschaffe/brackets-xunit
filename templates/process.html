@@ -4,17 +4,17 @@
 <title>{{title}}</title>
 <style type="text/css">
     .command, .detail, .content, .section { font-family: "Arial", Arial, sans-serif; }
-    .command { font-size: 1.1em;  min-width: 110px; display: inline-block; }
+    .command { font-size: 1.1em;  min-width: 150px; display: inline-block; }
     .details { font-size: 1.1em;  padding: 5px; }
     .content { font-size: .8em; background:#e6e6e6; border: 3px solid #cccccc; padding: 5px; }
-    .section { display:none; margin-top: 20px; }
+    .section { display:none; }
 </style>
 </head>
 <body>
 <span class="command">Running</span><span id="process" class="details">{{path}}</span><br>
 <span class="command">arguments</span><span id="arguments" class="details">{{args}}</span><br>
-<span class="command">status</span><span id="exitcode" class="details">still running</span><br>
-<span class="command">time</span><span id="time" class="details">still running</span><br>
+<span class="command">status</span><span id="exitcode" class="details">running</span><br>
+<span class="command">time</span><span id="time" class="details">0s</span><br>
 <span id="stdout-section" class="section">
 <span class="command">stdout</span>
 <div class="content" id="stdout" readonly></div>

@@ -419,7 +419,7 @@ define(function (require, exports, module) {
         .done(function (text, readTimestamp) {
             try {
                 config = JSON.parse(text);
-                if (config.hasOwnProperty("commands") && config.command !== '<path to js shell>') {
+                if (config.hasOwnProperty("commands") && config.commands[0].name !== '<description>') {
                     commands.push(TEST262TEST_CMD);
                     test262shells = config.commands;
                     CommandManager.register("Run test262 xUnit Test", TEST262TEST_CMD, function () {

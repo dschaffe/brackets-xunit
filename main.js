@@ -43,12 +43,12 @@ define(function (require, exports, module) {
         jasmineReportEntry  = new NativeFileSystem.FileEntry(moduledir + '/generated/jasmineReport.html'),
         qunitReportEntry    = new NativeFileSystem.FileEntry(moduledir + '/generated/qUnitReport.html'),
 		templateEntry       = new NativeFileSystem.FileEntry(moduledir + '/html/jasmineReportTemplate.html'),
-        reportJasNodeEntry         = new NativeFileSystem.FileEntry(moduledir + '/node/reports/jasmineReport.html'),
+        reportJasNodeEntry  = new NativeFileSystem.FileEntry(moduledir + '/node/reports/jasmineReport.html'),
         COMMAND_ID          = "BracketsXUnit.BracketsXUnit",
         YUITEST_CMD         = "yuitest_cmd",
         JASMINETEST_CMD     = "jasminetest_cmd",
         QUNITTEST_CMD       = "qunit_cmd",
-		JASNODETEST_CMD     = "jasnodetest_cmd",
+		NODETEST_CMD     = "nodetest_cmd",
         projectMenu         = Menus.getContextMenu(Menus.ContextMenuIds.PROJECT_MENU),
         workingsetMenu      = Menus.getContextMenu(Menus.ContextMenuIds.WORKING_SET_MENU),
         nodeConnection      = null;
@@ -212,16 +212,19 @@ define(function (require, exports, module) {
     //   YUI: 'YUI(' and 'Test.runner.test'
     //   jasmine: 'describe' and 'it'
     //   QUnit: 'test()' and 'it()'
+	//	 node: look for the jslint option called node and is set to true
+	//   /*jslint node:true */  See http://www.jslint.com/lint.html#options
     // todo: unit test this function
     function determineFileType(fileEntry) {
+	
         if (fileEntry) {
             var text = DocumentManager.getCurrentDocument().getText();
             if (text.match(/brackets-xunit:\s*yui/i) !== null) {
                 return "yui";
             } else if (text.match(/brackets-xunit:\s*jasmine/i) !== null) {
                 return "jasmine";
-            } else if (text.match(/brackets-xunit:\s*jas-node/i) !== null) {
-                return "jasnode";
+            } else if (text.match(/node: true/i) && text.match(/describe\s*\(/)) {
+                return "node";
             } else if (text.match(/brackets-xunit:\s*qunit/i) !== null) {
                 return "qunit";
             } else if (text.match(/YUI\s*\(/) && text.match(/Test\.Runner\.run\s*\(/)) {
@@ -246,7 +249,7 @@ define(function (require, exports, module) {
         runQUnit();
     });
 	
-	CommandManager.register("Run Jasmine-Node xUnit Test", JASNODETEST_CMD, function () {
+	CommandManager.register("Run Jasmine-Node xUnit Test", NODETEST_CMD, function () {
         runJasmineNode();
     });
     
@@ -256,6 +259,7 @@ define(function (require, exports, module) {
         projectMenu.removeMenuItem(YUITEST_CMD);
         projectMenu.removeMenuItem(JASMINETEST_CMD);
         projectMenu.removeMenuItem(QUNITTEST_CMD);
+		projectMenu.removeMenuItem(NODETEST_CMD);
         
         var type = determineFileType(selectedEntry);
         
@@ -265,8 +269,8 @@ define(function (require, exports, module) {
             projectMenu.addMenuItem(JASMINETEST_CMD, "", Menus.LAST);
         } else if (type === "qunit") {
             projectMenu.addMenuItem(QUNITTEST_CMD, "", Menus.LAST);
-        } else if (type === "jasnode") {
-            projectMenu.addMenuItem(JASNODETEST_CMD, "", Menus.LAST);
+        } else if (type === "node") {
+            projectMenu.addMenuItem(NODETEST_CMD, "", Menus.LAST);
         }
     });
     
@@ -276,7 +280,7 @@ define(function (require, exports, module) {
         workingsetMenu.removeMenuItem(YUITEST_CMD);
         workingsetMenu.removeMenuItem(JASMINETEST_CMD);
         workingsetMenu.removeMenuItem(QUNITTEST_CMD);
-		workingsetMenu.removeMenuItem(JASNODETEST_CMD);
+		workingsetMenu.removeMenuItem(NODETEST_CMD);
         
         var type = determineFileType(selectedEntry);
         
@@ -286,8 +290,8 @@ define(function (require, exports, module) {
             workingsetMenu.addMenuItem(JASMINETEST_CMD, "", Menus.LAST);
         } else if (type === "qunit") {
             workingsetMenu.addMenuItem(QUNITTEST_CMD, "", Menus.LAST);
-        } else if (type === "qunit") {
-            workingsetMenu.addMenuItem(JASNODETEST_CMD, "", Menus.LAST);
+        } else if (type === "node") {
+            workingsetMenu.addMenuItem(NODETEST_CMD, "", Menus.LAST);
         }
     });
 

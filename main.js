@@ -93,7 +93,7 @@ define(function (require, exports, module) {
         var dir = entry.fullPath.substring(0, entry.fullPath.lastIndexOf('/') + 1),
             contents = '',
             includes = '';
-        if (entry === DocumentManager.getCurrentDocument().file) {
+        if (entry.fullPath === DocumentManager.getCurrentDocument().file.fullPath) {
             contents = DocumentManager.getCurrentDocument().getText();
         }
 
@@ -282,7 +282,8 @@ define(function (require, exports, module) {
                 argsout = argsout + args[i] + " ";
             }
         }
-        nodeConnection.domains.process.spawnSession(path, args, {}).done(function (pid) {
+        nodeConnection.domains.process.spawnSession(path, args, {}).done(function (data) {
+            var pid = data[0];
             var template = require("text!templates/process.html");
             var html = Mustache.render(template, { path: path, title: "script - " + path, args: argsout});
             var newWindow = window.open("about:blank", null, "width=600,height=200");
@@ -292,8 +293,8 @@ define(function (require, exports, module) {
             _windows[pid] = {window: newWindow, startTime: new Date(), type: "script"};
         });
     }
-
-        // determine if file is test262
+    
+    // determine if file is test262
     // look at file path for a test directory
     // from the test directory go back one level and look
     // for existance of tools/packaging/test262.py

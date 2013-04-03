@@ -126,8 +126,24 @@ define(function (require, exports, module) {
         });
     }
 
-
 	// jasmine-node
+	function runJasmineNode() {
+        var entry = ProjectManager.getSelectedItem();
+        if (entry === undefined) {
+            entry = DocumentManager.getCurrentDocument().file;
+        }
+        var path = entry.fullPath;
+        nodeConnection.domains.jasmine.runTest(path)
+            .fail(function (err) {
+                console.log("[brackets-jasmine] error running file: " + entry.fullPath + " message: " + err.toString());
+                var dlg = Dialogs.showModalDialog(
+                    Dialogs.DIALOG_ID_ERROR,
+                    "Jasmine Error",
+                    "The test file contained an error: " + err.toString()
+                );
+            });
+    }
+	
 	function chain() {
         var functions = Array.prototype.slice.call(arguments, 0);
         if (functions.length > 0) {
@@ -182,29 +198,12 @@ define(function (require, exports, module) {
                         window.open(reportJasNodeEntry.fullPath);
                     });
                 });
-            }
+	        }
         });
 
         chain(connect, loadJasmineDomain);
     });
     
-	function runJasmineNode() {
-        var entry = ProjectManager.getSelectedItem();
-        if (entry === null) {
-            entry = DocumentManager.getCurrentDocument().file;
-        }
-        var path = entry.fullPath;
-        nodeConnection.domains.jasmine.runTest(path)
-            .fail(function (err) {
-                console.log("[brackets-jasmine] error running file: " + entry.fullPath + " message: " + err.toString());
-                var dlg = Dialogs.showModalDialog(
-                    Dialogs.DIALOG_ID_ERROR,
-                    "Jasmine Error",
-                    "The test file contained an error: " + err.toString()
-                );
-            });
-    }
-	
     // determine if a file is a known test type
     // first look for brackets-xunit: [type], takes precedence
     // next look for distinguishing clues in the file:
@@ -214,13 +213,14 @@ define(function (require, exports, module) {
 	//	 node: '/*jslint node:true */' look for the jslint option called node and that
 	//   it is set to true.  See http://www.jslint.com/lint.html#options
     // todo: unit test this function
+	// todo: add support to filter out non-node .js files i.e. supporting files in a subfolder, etc.
     function determineFileType(fileEntry) {
 	
         if (fileEntry) {
             var text = "";
-			var pattern = new RegExp('(spec.js$|\/(spec|specs)\/)', 'i');
+			var pattern = new RegExp('(spec.js$|\/(spec|specs)\/)');
 			
-			if (fileEntry && fileEntry.fullPath.match(pattern, 'i') !== null) {
+			if (fileEntry && fileEntry.fullPath.match(pattern) && fileEntry.name.match(pattern) !== null) {
 					return "node";
 			} else {
 				if(!fileEntry.isDirectory){

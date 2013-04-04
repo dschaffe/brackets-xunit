@@ -44,6 +44,8 @@ define(function (require, exports, module) {
         qunitReportEntry    = new NativeFileSystem.FileEntry(moduledir + '/generated/qUnitReport.html'),
         configEntry         = new NativeFileSystem.FileEntry(moduledir + '/config.js'),
         config              = {},
+        templateEntry       = new NativeFileSystem.FileEntry(moduledir + '/html/jasmineReportTemplate.html'),
+        reportJasNodeEntry  = new NativeFileSystem.FileEntry(moduledir + '/node/reports/jasmineReport.html'),
         COMMAND_ID          = "BracketsXUnit.BracketsXUnit",
         commands            = [],
         YUITEST_CMD         = "yuitest_cmd",
@@ -51,6 +53,7 @@ define(function (require, exports, module) {
         QUNITTEST_CMD       = "qunit_cmd",
         TEST262TEST_CMD     = "test262_cmd",
         SCRIPT_CMD          = "script_cmd",
+        NODETEST_CMD        = "nodetest_cmd",
         projectMenu         = Menus.getContextMenu(Menus.ContextMenuIds.PROJECT_MENU),
         workingsetMenu      = Menus.getContextMenu(Menus.ContextMenuIds.WORKING_SET_MENU),
         nodeConnection      = new NodeConnection(),
@@ -217,7 +220,7 @@ define(function (require, exports, module) {
             var exitcodeText = doc.createElement("span");
             exitcodeText.className = "details";
             exitcodeText.id = "exitcode" + pid;
-            exitcodeText.innerHTML = "running with pid " + pid + "<br>";
+            exitcodeText.innerHTML = "running with pid " + pid;
             entrypoint.appendChild(exitcodeText);
             entrypoint.appendChild(doc.createElement("br"));
              
@@ -282,7 +285,8 @@ define(function (require, exports, module) {
                 argsout = argsout + args[i] + " ";
             }
         }
-        nodeConnection.domains.process.spawnSession(path, args, {}).done(function (pid) {
+        nodeConnection.domains.process.spawnSession(path, args, {}).done(function (status) {
+            var pid = status[0];
             var template = require("text!templates/process.html");
             var html = Mustache.render(template, { path: path, title: "script - " + path, args: argsout});
             var newWindow = window.open("about:blank", null, "width=600,height=200");
@@ -317,36 +321,33 @@ define(function (require, exports, module) {
         return deferred.promise();
     }
 
-    // determine if a file is a known test type
-    // first look for brackets-xunit: [type], takes precedence
-    // next look for distinguishing clues in the file:
-    //   YUI: 'YUI(' and 'Test.runner.test'
-    //   jasmine: 'describe' and 'it'
-    //   QUnit: 'test()' and 'it()'
-    //   test262: look at path for test directory then check for 
-    //           ../tools/packaging/test262.py
-    // todo: unit test this function
-    function determineFileType(fileEntry, text) {
-        if (fileEntry) {
-            if (text.match(/brackets-xunit:\s*yui/i) !== null) {
-                return "yui";
-            } else if (text.match(/brackets-xunit:\s*jasmine/i) !== null) {
-                return "jasmine";
-            } else if (text.match(/brackets-xunit:\s*qunit/i) !== null) {
-                return "qunit";
-            } else if (text.match(/brackets-xunit:\s*test262/i) !== null) {
-                return "test262";
-            } else if (text.match(/YUI\s*\(/) && text.match(/Test\.Runner\.run\s*\(/)) {
-                return "yui";
-            } else if (text.match(/describe\s*\(/) && text.match(/it\s*\(/)) {
-                return "jasmine";
-            } else if (text.match(/test\s*\(/) && text.match(/ok\s*\(/)) {
-                return "qunit";
-            } else if (text.match(/^#!/) !== null) {
-                return "script";
-            }
+    // jasmine-node
+    function runJasmineNode() {
+        var entry = ProjectManager.getSelectedItem();
+        if (entry === undefined) {
+            entry = DocumentManager.getCurrentDocument().file;
         }
-        return "unknown";
+        var path = entry.fullPath;
+        nodeConnection.domains.jasmine.runTest(path)
+            .fail(function (err) {
+                console.log("[brackets-jasmine] error running file: " + entry.fullPath + " message: " + err.toString());
+                var dlg = Dialogs.showModalDialog(
+                    Dialogs.DIALOG_ID_ERROR,
+                    "Jasmine Error",
+                    "The test file contained an error: " + err.toString()
+                );
+            });
+    }
+
+    function chain() {
+        var functions = Array.prototype.slice.call(arguments, 0);
+        if (functions.length > 0) {
+            var firstFunction = functions.shift();
+            var firstPromise = firstFunction.call();
+            firstPromise.done(function () {
+                chain.apply(null, functions);
+            });
+        }
     }
 
     // converts time in ms to a more readable string format
@@ -370,6 +371,182 @@ define(function (require, exports, module) {
         return result;
     }
 
+    AppInit.appReady(function () {
+        nodeConnection = new NodeConnection();
+        function connect() {
+            var connectionPromise = nodeConnection.connect(true);
+            connectionPromise.fail(function () {
+                console.error("[brackets-xunit] failed to connect to node");
+            });
+            return connectionPromise;
+        }
+
+        function loadJasmineDomain() {
+            var path = ExtensionUtils.getModulePath(module, "node/JasmineDomain");
+            var loadPromise = nodeConnection.loadDomains([path], true);
+            loadPromise.fail(function () {
+                console.log("[brackets-xunit] failed to load jasmine domain");
+            });
+            return loadPromise;
+        }
+
+        $(nodeConnection).on("jasmine.update", function (evt, jsondata) {
+            if (jsondata.length > 5 && jsondata.substring(0, 6) === 'Error:') {
+                var dlg = Dialogs.showModalDialog(
+                    Dialogs.DIALOG_ID_ERROR,
+                    "Jasmine Node Error",
+                    jsondata.substring(7)
+                );
+            } else {
+                FileUtils.readAsText(templateEntry).done(function (text, timestamp) {
+                    jsondata = jsondata.replace(/'/g, "");
+                    var data = JSON.parse(jsondata);
+                    var index = text.indexOf("%jsondata%");
+                    text = text.substring(0, index) + jsondata + text.substring(index + 10);
+                    index = text.indexOf("%time%");
+                    var totaltime = 0;
+                    var i;
+                    for (i = 0; i < data.length; i++) {
+                        totaltime = totaltime + parseFloat(data[i].time);
+                    }
+                    text = text.substring(0, index) + totaltime + text.substring(index + 6);
+                    FileUtils.writeText(reportJasNodeEntry, text).done(function () {
+                        window.open(reportJasNodeEntry.fullPath);
+                    });
+                });
+	        }
+        });
+
+        function loadProcessDomain() {
+            var path = ExtensionUtils.getModulePath(module, "node/ProcessDomain");
+            var loadPromise = nodeConnection.loadDomains([path], true);
+            loadPromise.fail(function () {
+                console.log("[brackets-xunit] failed to load process domain");
+            });
+            return loadPromise;
+        }
+    
+        $(nodeConnection).on("process.stdout", function (event, pid, data) {
+            data = data.replace(/\n/g, '<br>');
+            if (_windows.hasOwnProperty(pid) === false) {
+                showError("Process Error", "there is no window with pid=" + pid);
+            } else {
+                var _window = _windows[pid].window,
+                    _time = _windows[pid].startTime,
+                    _type = _windows[pid].type,
+                    elapsed = new Date() - _time;
+                if (_windows[pid].type === 'test262') {
+                    _window.document.getElementById("stdoutsection" + pid).style.display = "block";
+                    _window.document.getElementById("stdout" + pid).innerHTML += data;
+                    _window.document.getElementById("stdout" + pid).scrollTop = _window.document.getElementById("stdout" + pid).scrollHeight;
+                    _window.document.getElementById("time" + pid).innerHTML = formatTime(elapsed);
+                    _windows[pid].output += data;
+                    var currentoutput = _windows[pid].output;
+                    if (currentoutput.indexOf("=== Summary ===") > -1) {
+                        currentoutput = currentoutput.substring(0, currentoutput.indexOf("=== Summary ==="));
+                    }
+                    var passes = currentoutput.match(/passed/g);
+                    if (passes === null) {
+                        passes = 0;
+                    } else {
+                        passes = passes.length;
+                    }
+                    var status = passes + " passes, ";
+                    var expectedfailures = currentoutput.match(/failed in (non-)?strict mode as expected<br>/g);
+                    var failures = currentoutput.match(/failed in (non-)?strict mode ===<br>/g);
+                    if (failures === null) {
+                        status += "0 failures";
+                    } else {
+                        status += ' <span style="color:red">' + failures.length + ' failures</span>';
+                    }
+                    if (expectedfailures !== null) {
+                        status += ", " + expectedfailures.length + " expected failures";
+                    }
+                    _window.document.getElementById("status" + pid).innerHTML = status;
+                } else {
+                    _window.document.getElementById("stdout-section").style.display = "block";
+                    _window.document.getElementById("stdout").innerHTML += data;
+                    _window.document.getElementById("time").innerHTML = formatTime(elapsed);
+                }
+            }
+        });
+                
+        $(nodeConnection).on("process.stderr", function (event, pid, data) {
+            data = data.replace(/\n/g, '<br>');
+            if (_windows.hasOwnProperty(pid) === false) {
+                showError("Process Error", "there is no window with pid=" + pid);
+            } else {
+                var _window = _windows[pid].window,
+                    _time = _windows[pid].startTime,
+                    _type = _windows[pid].type,
+                    elapsed = new Date() - _time;
+                if (_windows[pid].type === 'test262') {
+                    _window.document.getElementById("stderrsection" + pid).style.display = "block";
+                    _window.document.getElementById("stderr" + pid).innerHTML += data;
+                    _window.document.getElementById("time" + pid).innerHTML = formatTime(elapsed);
+                    _windows[pid].error += data;
+                } else {
+                    _window.document.getElementById("stderr-section").style.display = "block";
+                    _window.document.getElementById("stderr").innerHTML += data;
+                    _window.document.getElementById("time").innerHTML = formatTime(elapsed);
+                }
+            }
+        });
+
+        $(nodeConnection).on("process.exit", function (event, pid, code) {
+            if (_windows.hasOwnProperty(pid) === false) {
+                showError("Process Error", "there is no window with pid=" + pid);
+            } else {
+                var _window = _windows[pid].window,
+                    _time = _windows[pid].startTime,
+                    elapsed = new Date() - _time;
+                if (_windows[pid].type === 'test262') {
+                    _window.document.getElementById("exitcode" + pid).innerHTML = "finished with exit code " + code;
+                    _window.document.getElementById("time" + pid).innerHTML = formatTime(elapsed);
+                } else {
+                    _window.document.getElementById("exitcode").innerHTML = "finished with exit code " + code;
+                    _window.document.getElementById("time").innerHTML = formatTime(elapsed);
+                }
+            }
+        });
+        chain(connect, loadJasmineDomain, loadProcessDomain);
+    });
+    
+    // determine if a file is a known test type
+    // first look for brackets-xunit: [type], takes precedence
+    // next look for distinguishing clues in the file:
+    //   YUI: 'YUI(' and 'Test.runner.test'
+    //   jasmine: 'describe' and 'it'
+    //   QUnit: 'test()' and 'it()'
+    //   test262: look at path for test directory then check for 
+    //           ../tools/packaging/test262.py
+    function determineFileType(fileEntry, text) {
+        if (fileEntry) {
+            if (text.match(/brackets-xunit:\s*yui/i) !== null) {
+                return "yui";
+            } else if (text.match(/node: true/i) && text.match(/describe\s*\(/)) {
+                return "node";
+            } else if (text.match(/brackets-xunit:\s*jasmine-node/i)) {
+                return "node";
+            } else if (text.match(/brackets-xunit:\s*jasmine/i) !== null) {
+                return "jasmine";
+            } else if (text.match(/brackets-xunit:\s*qunit/i) !== null) {
+                return "qunit";
+            } else if (text.match(/brackets-xunit:\s*test262/i) !== null) {
+                return "test262";
+            } else if (text.match(/YUI\s*\(/) && text.match(/Test\.Runner\.run\s*\(/)) {
+                return "yui";
+            } else if (text.match(/describe\s*\(/) && text.match(/it\s*\(/)) {
+                return "jasmine";
+            } else if (text.match(/test\s*\(/) && text.match(/ok\s*\(/)) {
+                return "qunit";
+            } else if (text.match(/^#!/) !== null) {
+                return "script";
+            }
+        }
+        return "unknown";
+    }
+
     // on click click check if file matches a test type and add context menuitem
     function checkFileTypes(menu, entry, text) {
         var i;
@@ -385,6 +562,8 @@ define(function (require, exports, module) {
             menu.addMenuItem(QUNITTEST_CMD, "", Menus.LAST);
         } else if (type === "script") {
             menu.addMenuItem(SCRIPT_CMD, "", Menus.LAST);
+        } else if (type === "node") {
+            menu.addMenuItem(NODETEST_CMD, "", Menus.LAST);
         } else if (commands.indexOf("test262_cmd") > -1) {
             if (type === "test262") {
                 menu.addMenuItem(TEST262TEST_CMD, "", Menus.LAST);
@@ -402,7 +581,7 @@ define(function (require, exports, module) {
     }
 
     // Register commands as right click menu items
-    commands = [ YUITEST_CMD, JASMINETEST_CMD, QUNITTEST_CMD, SCRIPT_CMD ];
+    commands = [ YUITEST_CMD, JASMINETEST_CMD, QUNITTEST_CMD, SCRIPT_CMD, NODETEST_CMD ];
     CommandManager.register("Run YUI Unit Test", YUITEST_CMD, function () {
         runYUI();
     });
@@ -415,6 +594,10 @@ define(function (require, exports, module) {
     CommandManager.register("Run Script", SCRIPT_CMD, function () {
         runScript();
     });
+    CommandManager.register("Run Jasmine-Node xUnit Test", NODETEST_CMD, function () {
+        runJasmineNode();
+    });
+    
     FileUtils.readAsText(configEntry)
         .done(function (text, readTimestamp) {
             try {
@@ -445,101 +628,10 @@ define(function (require, exports, module) {
         }
         checkFileTypes(projectMenu, selectedEntry, text);
     });
-
-    // Determine type of test for selected item in working set
+    // Determine type of test for selected item in project
     $(workingsetMenu).on("beforeContextMenuOpen", function (evt) {
         var selectedEntry = DocumentManager.getCurrentDocument().file,
             text = DocumentManager.getCurrentDocument().getText();
         checkFileTypes(workingsetMenu, selectedEntry, text);
-    });
-
-    AppInit.appReady(function () {
-        nodeConnection.connect(true).done(function () {
-            var path = ExtensionUtils.getModulePath(module, "node/ProcessDomain");
-            nodeConnection.loadDomains([path], true).done(function () {
-                var $nodeConnection = $(nodeConnection);
-                $nodeConnection.on("process.stdout", function (event, pid, data) {
-                    data = data.replace(/\n/g, '<br>');
-                    if (_windows.hasOwnProperty(pid) === false) {
-                        showError("Process Error", "there is no window with pid=" + pid);
-                    } else {
-                        var _window = _windows[pid].window,
-                            _time = _windows[pid].startTime,
-                            _type = _windows[pid].type,
-                            elapsed = new Date() - _time;
-                        if (_windows[pid].type === 'test262') {
-                            _window.document.getElementById("stdoutsection" + pid).style.display = "block";
-                            _window.document.getElementById("stdout" + pid).innerHTML += data;
-                            _window.document.getElementById("stdout" + pid).scrollTop = _window.document.getElementById("stdout" + pid).scrollHeight;
-                            _window.document.getElementById("time" + pid).innerHTML = formatTime(elapsed);
-                            _windows[pid].output += data;
-                            var currentoutput = _windows[pid].output;
-                            if (currentoutput.indexOf("=== Summary ===") > -1) {
-                                currentoutput = currentoutput.substring(0, currentoutput.indexOf("=== Summary ==="));
-                            }
-                            var passes = currentoutput.match(/passed/g);
-                            if (passes === null) {
-                                passes = 0;
-                            } else {
-                                passes = passes.length;
-                            }
-                            var status = passes + " passes, ";
-                            var expectedfailures = currentoutput.match(/failed in (non-)?strict mode as expected<br>/g);
-                            var failures = currentoutput.match(/failed in (non-)?strict mode ===<br>/g);
-                            if (failures === null) {
-                                status += "0 failures";
-                            } else {
-                                status += ' <span style="color:red">' + failures.length + ' failures</span>';
-                            }
-                            if (expectedfailures !== null) {
-                                status += ", " + expectedfailures.length + " expected failures";
-                            }
-                            _window.document.getElementById("status" + pid).innerHTML = status;
-                        } else {
-                            _window.document.getElementById("stdout-section").style.display = "block";
-                            _window.document.getElementById("stdout").innerHTML += data;
-                            _window.document.getElementById("time").innerHTML = formatTime(elapsed);
-                        }
-                    }
-                });
-                $nodeConnection.on("process.stderr", function (event, pid, data) {
-                    data = data.replace(/\n/g, '<br>');
-                    if (_windows.hasOwnProperty(pid) === false) {
-                        showError("Process Error", "there is no window with pid=" + pid);
-                    } else {
-                        var _window = _windows[pid].window,
-                            _time = _windows[pid].startTime,
-                            _type = _windows[pid].type,
-                            elapsed = new Date() - _time;
-                        if (_windows[pid].type === 'test262') {
-                            _window.document.getElementById("stderrsection" + pid).style.display = "block";
-                            _window.document.getElementById("stderr" + pid).innerHTML += data;
-                            _window.document.getElementById("time" + pid).innerHTML = formatTime(elapsed);
-                            _windows[pid].error += data;
-                        } else {
-                            _window.document.getElementById("stderr-section").style.display = "block";
-                            _window.document.getElementById("stderr").innerHTML += data;
-                            _window.document.getElementById("time").innerHTML = formatTime(elapsed);
-                        }
-                    }
-                });
-                $nodeConnection.on("process.exit", function (event, pid, code) {
-                    if (_windows.hasOwnProperty(pid) === false) {
-                        showError("Process Error", "there is no window with pid=" + pid);
-                    } else {
-                        var _window = _windows[pid].window,
-                            _time = _windows[pid].startTime,
-                            elapsed = new Date() - _time;
-                        if (_windows[pid].type === 'test262') {
-                            _window.document.getElementById("exitcode" + pid).innerHTML = "finished with exit code " + code;
-                            _window.document.getElementById("time" + pid).innerHTML = formatTime(elapsed);
-                        } else {
-                            _window.document.getElementById("exitcode").innerHTML = "finished with exit code " + code;
-                            _window.document.getElementById("time").innerHTML = formatTime(elapsed);
-                        }
-                    }
-                });
-            });
-        });
     });
 });

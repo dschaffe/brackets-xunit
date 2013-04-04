@@ -175,57 +175,6 @@ define(function (require, exports, module) {
         }
     }
 
-    OldAppInit.appReady(function () {
-        jasmineNodeConnection = new NodeConnection();
-        function connect() {
-            var connectionPromise = jasmineNodeConnection.connect(true);
-            connectionPromise.fail(function () {
-                console.error("[brackets-xunit] failed to connect to node");
-            });
-            return connectionPromise;
-        }
-
-        function loadJasmineDomain() {
-            var path = ExtensionUtils.getModulePath(module, "node/JasmineDomain");
-            var loadPromise = jasmineNodeConnection.loadDomains([path], true);
-            loadPromise.fail(function () {
-                console.log("[brackets-xunit] failed to load jasmine domain");
-            });
-            return loadPromise;
-        }
-
-        $(jasmineNodeConnection).on("jasmine.update", function (evt, jsondata) {
-            if (jsondata.length > 5 && jsondata.substring(0, 6) === 'Error:') {
-                var dlg = Dialogs.showModalDialog(
-                    Dialogs.DIALOG_ID_ERROR,
-                    "Jasmine Node Error",
-                    jsondata.substring(7)
-                );
-            } else {
-                FileUtils.readAsText(templateEntry).done(function (text, timestamp) {
-                    jsondata = jsondata.replace(/'/g, "");
-                    var data = JSON.parse(jsondata);
-                    var index = text.indexOf("%jsondata%");
-                    text = text.substring(0, index) + jsondata + text.substring(index + 10);
-                    index = text.indexOf("%time%");
-                    var totaltime = 0;
-                    var i;
-                    for (i = 0; i < data.length; i++) {
-                        totaltime = totaltime + parseFloat(data[i].time);
-                    }
-                    text = text.substring(0, index) + totaltime + text.substring(index + 6);
-                    FileUtils.writeText(reportJasNodeEntry, text).done(function () {
-                        window.open(reportJasNodeEntry.fullPath);
-                    });
-                });
-	        }
-        });
-
-        chain(connect, loadJasmineDomain);
-    });
-    // end jasmine-node
-
-
     // Execute test262 test
     function runTest262() {
         var entry = ProjectManager.getSelectedItem();
@@ -486,6 +435,8 @@ define(function (require, exports, module) {
             menu.addMenuItem(JASMINETEST_CMD, "", Menus.LAST);
         } else if (type === "qunit") {
             menu.addMenuItem(QUNITTEST_CMD, "", Menus.LAST);
+        } else if (type === "node") {
+            menu.addMenuItem(NODETEST_CMD, "", Menus.LAST);
         } else if (type === "script") {
             menu.addMenuItem(SCRIPT_CMD, "", Menus.LAST);
         } else if (commands.indexOf("test262_cmd") > -1) {

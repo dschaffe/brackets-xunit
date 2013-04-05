@@ -29,9 +29,18 @@
     var spawn = require("child_process").spawn;
 
     var _sessions = {},
-        domainManager;
+        domainManager,
+        cacheTimeDefault = 3000;  // minimum time in seconds to send stdout data through the process.stdout event
 
-    function spawnSession(command, parameters, directory, shell) {
+    function spawnSession(info) {
+        var command = info.executable,
+            parameters = info.args,
+            directory = info.directory,
+            shell = info.shells,
+            cacheTime = info.cacheTime;
+        if (cacheTime === undefined) {
+            cacheTime = cacheTimeDefault;
+        }
         if (parameters === undefined) {
             parameters = [];
         }
@@ -39,28 +48,37 @@
             directory = command.substring(0, command.lastIndexOf('/'));
         }
         var session = spawn(command, parameters, { cwd: directory });
+        _sessions[session.pid] = {session: session, lastSentTime: Number(new Date()), cacheData: '', cacheTime: cacheTime};
+        
         session.stdout.setEncoding();
         session.stdout.on("data", function (data) {
-            domainManager.emitEvent("process", "stdout", [session.pid, data]);
+            var result = _sessions[session.pid];
+            if (Number(new Date()) - result.lastSentTime > result.cacheTime) {
+                result.lastSentTime = Number(new Date());
+                domainManager.emitEvent("process", "stdout", {pid: session.pid, data: result.cacheData + data});
+                result.cacheData = '';
+            } else {
+                result.cacheData += data;
+            }
         });
     
         session.stderr.setEncoding();
         session.stderr.on("data", function (data) {
-            domainManager.emitEvent("process", "stderr", [session.pid, data]);
+            domainManager.emitEvent("process", "stderr", {pid: session.pid, data: data});
         });
     
         session.on("exit", function (code) {
-            domainManager.emitEvent("process", "exit", [session.pid, code]);
+            var result = _sessions[session.pid];
+            domainManager.emitEvent("process", "exit", { pid : session.pid, exitcode : code, data: result.cacheData});
         });
     
-        _sessions[session.pid] = session;
         var cmds = [command];
         cmds = cmds.concat(parameters);
         return [session.pid, cmds, shell];
     }
     
     function killSession(pid) {
-        var session = _sessions[pid];
+        var session = _sessions[pid].session;
     
         if (session) {
             session.kill();
@@ -157,8 +175,8 @@
                     description: "Shell PID"
                 },
                 {
-                    name: "code",
-                    type: "number",
+                    name: "result",
+                    type: "object",
                     description: "exit code"
                 }
             ]

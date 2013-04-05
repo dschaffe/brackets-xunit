@@ -173,13 +173,13 @@ define(function (require, exports, module) {
         var spawned = function (data) {
             var pid = data[0],
                 shell = data[2].name + " : " + data[2].path;
-            _windows[pid] = {window: newWindow, startTime: new Date(), type: "test262", output: "", index: i };
+            _windows[pid] = {window: newWindow, startTime: new Date(), type: "test262", passes: 0, fails: 0, expfails: 0, current: '', done: false };
             var doc = newWindow.document;
             var entrypoint = doc.getElementById("entrypoint");
             var shellLabel = doc.createElement("span");
             shellLabel.className = "command";
             shellLabel.innerHTML = "Shell";
-            shellLabel.style.marginTop = "20px";
+            shellLabel.style.marginTop = "10px";
             entrypoint.appendChild(shellLabel);
             
             var shellText = doc.createElement("span");
@@ -227,6 +227,7 @@ define(function (require, exports, module) {
             var stdoutsection = doc.createElement("span");
             stdoutsection.id = "stdoutsection" + pid;
             stdoutsection.className = "section";
+            stdoutsection.style.display = "block";
             var stdoutlabel = doc.createElement("span");
             stdoutlabel.className = "command";
             stdoutlabel.appendChild(doc.createTextNode("output"));
@@ -258,7 +259,7 @@ define(function (require, exports, module) {
         };
         for (i = 0; i < test262shells.length; i++) {
             params = ["--full-summary", "--command", test262shells[i].path, test];
-            nodeConnection.domains.process.spawnSession(test262, params, base, test262shells[i]).done(spawned);
+            nodeConnection.domains.process.spawnSession({executable: test262, args: params, directory: base, shells: test262shells[i], cacheTime: 3000}).done(spawned);
         }
         newWindow.focus();
     }
@@ -285,7 +286,7 @@ define(function (require, exports, module) {
                 argsout = argsout + args[i] + " ";
             }
         }
-        nodeConnection.domains.process.spawnSession(path, args, {}).done(function (status) {
+        nodeConnection.domains.process.spawnSession({executable: path, args: args, cacheTime: 100}).done(function (status) {
             var pid = status[0];
             var template = require("text!templates/process.html");
             var html = Mustache.render(template, { path: path, title: "script - " + path, args: argsout});
@@ -425,8 +426,54 @@ define(function (require, exports, module) {
             });
             return loadPromise;
         }
-    
-        $(nodeConnection).on("process.stdout", function (event, pid, data) {
+
+        function processOutput(pid, data) {
+            var status = '';
+            if (_windows[pid].done === false) {
+                if (data.indexOf("=== Summary ===") > -1) {
+                    _windows[pid].done = true;
+                }
+                var passes = data.match(/passed/g);
+                if (passes === null) {
+                    passes = 0;
+                } else {
+                    passes = passes.length;
+                }
+                _windows[pid].passes += passes;
+                if (passes > 0) {
+                    status += '<span style="color:green">' + _windows[pid].passes + ' passes</span>, ';
+                } else {
+                    status += _windows[pid].passes + " passes, ";
+                }
+                var failures = data.match(/failed in (non-)?strict mode ===<br>/g);
+                if (failures === null) {
+                    failures = 0;
+                } else {
+                    failures = failures.length;
+                }
+                _windows[pid].fails += failures;
+                if (_windows[pid].fails === 0) {
+                    status += "0 failures";
+                } else {
+                    status += ' <span style="color:red">' + _windows[pid].fails + ' failures</span>';
+                }
+                var expectedfailures = data.match(/failed in (non-)?strict mode as expected<br>/g);
+                if (expectedfailures === null) {
+                    expectedfailures = 0;
+                } else {
+                    expectedfailures = expectedfailures.length;
+                }
+                _windows[pid].expfails += expectedfailures;
+                if (_windows[pid].expfails > 0) {
+                    status += ", " + _windows[pid].expfails + " expected failures";
+                }
+                _windows[pid].window.document.getElementById("status" + pid).innerHTML = status;
+            }
+        }
+            
+        $(nodeConnection).on("process.stdout", function (event, result) {
+            var pid = result.pid,
+                data = result.data;
             data = data.replace(/\n/g, '<br>');
             if (_windows.hasOwnProperty(pid) === false) {
                 showError("Process Error", "there is no window with pid=" + pid);
@@ -436,33 +483,16 @@ define(function (require, exports, module) {
                     _type = _windows[pid].type,
                     elapsed = new Date() - _time;
                 if (_windows[pid].type === 'test262') {
-                    _window.document.getElementById("stdoutsection" + pid).style.display = "block";
+                    data = _windows[pid].current + data;
+                    var status = '';
+                    _windows[pid].current = data.substring(data.lastIndexOf("<br>") + 4);
+                    if (_windows[pid.current] !== '') {
+                        data = data.substring(0, data.lastIndexOf('<br>') + 4);
+                    }
                     _window.document.getElementById("stdout" + pid).innerHTML += data;
                     _window.document.getElementById("stdout" + pid).scrollTop = _window.document.getElementById("stdout" + pid).scrollHeight;
                     _window.document.getElementById("time" + pid).innerHTML = formatTime(elapsed);
-                    _windows[pid].output += data;
-                    var currentoutput = _windows[pid].output;
-                    if (currentoutput.indexOf("=== Summary ===") > -1) {
-                        currentoutput = currentoutput.substring(0, currentoutput.indexOf("=== Summary ==="));
-                    }
-                    var passes = currentoutput.match(/passed/g);
-                    if (passes === null) {
-                        passes = 0;
-                    } else {
-                        passes = passes.length;
-                    }
-                    var status = passes + " passes, ";
-                    var expectedfailures = currentoutput.match(/failed in (non-)?strict mode as expected<br>/g);
-                    var failures = currentoutput.match(/failed in (non-)?strict mode ===<br>/g);
-                    if (failures === null) {
-                        status += "0 failures";
-                    } else {
-                        status += ' <span style="color:red">' + failures.length + ' failures</span>';
-                    }
-                    if (expectedfailures !== null) {
-                        status += ", " + expectedfailures.length + " expected failures";
-                    }
-                    _window.document.getElementById("status" + pid).innerHTML = status;
+                    processOutput(pid, data);
                 } else {
                     _window.document.getElementById("stdout-section").style.display = "block";
                     _window.document.getElementById("stdout").innerHTML += data;
@@ -471,7 +501,9 @@ define(function (require, exports, module) {
             }
         });
                 
-        $(nodeConnection).on("process.stderr", function (event, pid, data) {
+        $(nodeConnection).on("process.stderr", function (event, result) {
+            var pid = result.pid,
+                data = result.data;
             data = data.replace(/\n/g, '<br>');
             if (_windows.hasOwnProperty(pid) === false) {
                 showError("Process Error", "there is no window with pid=" + pid);
@@ -493,17 +525,27 @@ define(function (require, exports, module) {
             }
         });
 
-        $(nodeConnection).on("process.exit", function (event, pid, code) {
+        $(nodeConnection).on("process.exit", function (event, result) {
+            var pid = result.pid,
+                data = result.data;
+            data = data.replace(/\n/g, '<br>');
             if (_windows.hasOwnProperty(pid) === false) {
                 showError("Process Error", "there is no window with pid=" + pid);
             } else {
                 var _window = _windows[pid].window,
                     _time = _windows[pid].startTime,
-                    elapsed = new Date() - _time;
+                    elapsed = new Date() - _time,
+                    code = result.exitcode;
                 if (_windows[pid].type === 'test262') {
+                    var status = '';
+                    _window.document.getElementById("stdout" + pid).innerHTML += data;
+                    _window.document.getElementById("stdout" + pid).scrollTop = _window.document.getElementById("stdout" + pid).scrollHeight;
                     _window.document.getElementById("exitcode" + pid).innerHTML = "finished with exit code " + code;
                     _window.document.getElementById("time" + pid).innerHTML = formatTime(elapsed);
+                    processOutput(pid, data);
                 } else {
+                    _window.document.getElementById("stdout-section").style.display = "block";
+                    _window.document.getElementById("stdout").innerHTML += data;
                     _window.document.getElementById("exitcode").innerHTML = "finished with exit code " + code;
                     _window.document.getElementById("time").innerHTML = formatTime(elapsed);
                 }

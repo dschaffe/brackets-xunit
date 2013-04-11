@@ -123,12 +123,20 @@ define(function (require, exports, module) {
         contents = DocumentManager.getCurrentDocument().getText();
         includes = parseIncludes(contents, dir);
         var data = { filename : entry.name,
+					 fullpath : entry.fullPath,
                      title : 'Jasmine test - ' + entry.name,
                      includes : includes,
                      contents : DocumentManager.getCurrentDocument().getText()
                    };
-        var template = require("text!templates/jasmine.html");
-        var html = Mustache.render(template, data);
+	    if (data.contents.match(/define\(/)) {
+			var filepath = { fullpath: entry.fullPath };
+			var template = require("text!templates/jasmine_requirejs.html");
+        	var html = Mustache.render(template, data);
+	} else {
+			var template = require("text!templates/jasmine.html");
+        	var html = Mustache.render(template, data);
+		}
+
         FileUtils.writeText(jasmineReportEntry, html).done(function () {
             var report = window.open(jasmineReportEntry.fullPath);
             report.focus();
@@ -782,6 +790,8 @@ define(function (require, exports, module) {
         if (fileEntry) {
             if (text.match(/brackets-xunit:\s*yui/i) !== null) {
                 return "yui";
+            } else if (text.match(/define\(/i) && text.match(/describe\s*\(/)) {
+                return "jasmine";
             } else if (text.match(/node: true/i) && text.match(/describe\s*\(/)) {
                 return "node";
             } else if (text.match(/brackets-xunit:\s*jasmine-node/i)) {
@@ -806,8 +816,7 @@ define(function (require, exports, module) {
         }
         return "unknown";
     }
-    function something() {}
-    // on click click check if file matches a test type and add context menuitem
+    // on click check if file matches a test type and add context menuitem
     function checkFileTypes(menu, entry, text) {
         var i;
         for (i = 0; i < commands.length; i++) {

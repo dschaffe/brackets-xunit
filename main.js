@@ -118,8 +118,8 @@ define(function (require, exports, module) {
 	    if (data.contents.match(/define\(/)) {
 			var filepath = { fullpath: entry.fullPath };
 			var template = require("text!templates/jasmine_requirejs.html");
-        	var html = Mustache.render(template, filepath);
-		} else {
+        	var html = Mustache.render(template, data);
+	} else {
 			var template = require("text!templates/jasmine.html");
         	var html = Mustache.render(template, data);
 		}

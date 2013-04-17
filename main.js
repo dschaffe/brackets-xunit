@@ -41,9 +41,6 @@ define(function (require, exports, module) {
         FileViewController  = brackets.getModule("project/FileViewController");
 
     var moduledir           = FileUtils.getNativeModuleDirectoryPath(module),
-        jasmineReportEntry  = new NativeFileSystem.FileEntry(moduledir + '/generated/jasmineReport.html'),
-        qunitReportEntry    = new NativeFileSystem.FileEntry(moduledir + '/generated/qUnitReport.html'),
-        yuiReportEntry      = new NativeFileSystem.FileEntry(moduledir + '/generated/yuiReport.html'),
         configEntry         = new NativeFileSystem.FileEntry(moduledir + '/config.js'),
         config              = {},
         templateEntry       = new NativeFileSystem.FileEntry(moduledir + '/html/jasmineReportTemplate.html'),
@@ -59,11 +56,13 @@ define(function (require, exports, module) {
         GENERATE_JASMINE_CMD = "generate_jasmine_cmd",
         GENERATE_QUNIT_CMD  = "generate_qunit_cmd",
         GENERATE_YUI_CMD    = "generate_yui_cmd",
+        VIEWHTML_CMD        = "viewhtml_cmd",
         projectMenu         = Menus.getContextMenu(Menus.ContextMenuIds.PROJECT_MENU),
         workingsetMenu      = Menus.getContextMenu(Menus.ContextMenuIds.WORKING_SET_MENU),
         nodeConnection      = new NodeConnection(),
         test262shells       = [],
-        _windows            = {};
+        _windows            = {},
+        testFileIndex       = 0;
 
     // display a modal dialog when an error occurs
     function showError(title, message) {
@@ -88,6 +87,16 @@ define(function (require, exports, module) {
         return includes;
     }
    
+    function chain() {
+        var functions = Array.prototype.slice.call(arguments, 0);
+        if (functions.length > 0) {
+            var firstFunction = functions.shift();
+            var firstPromise = firstFunction.call();
+            firstPromise.done(function () {
+                chain.apply(null, functions);
+            });
+        }
+    }
     // Execute YUI test
     function runYUI() {
         var entry = ProjectManager.getSelectedItem();
@@ -95,7 +104,12 @@ define(function (require, exports, module) {
             entry = DocumentManager.getCurrentDocument().file;
         }
         var dir = entry.fullPath.substring(0, entry.fullPath.lastIndexOf('/') + 1),
+            dirEntry = new NativeFileSystem.DirectoryEntry(dir),
+            fname = DocumentManager.getCurrentDocument().filename,
             contents = DocumentManager.getCurrentDocument().getText(),
+            testName = entry.fullPath.substring(entry.fullPath.lastIndexOf("/") + 1),
+            testBase = testName.substring(0, testName.lastIndexOf('.')),
+            yuiReportEntry = new NativeFileSystem.FileEntry(dir + testBase + '/yuiReport.html'),
             includes = parseIncludes(contents, dir),
             data = { filename : entry.name,
                      title : 'YUI test - ' + entry.name,
@@ -105,9 +119,11 @@ define(function (require, exports, module) {
                    };
         var template = require("text!templates/yui.html");
         var html = Mustache.render(template, data);
-        FileUtils.writeText(yuiReportEntry, html).done(function () {
-            var report = window.open(yuiReportEntry.fullPath);
-            report.focus();
+        dirEntry.getDirectory(dir + testBase, {create: true}, function () {
+            FileUtils.writeText(yuiReportEntry, html).done(function () {
+                var report = window.open(yuiReportEntry.fullPath);
+                report.focus();
+            });
         });
     }
  
@@ -118,28 +134,72 @@ define(function (require, exports, module) {
             entry = DocumentManager.getCurrentDocument().file;
         }
         var dir = entry.fullPath.substring(0, entry.fullPath.lastIndexOf('/') + 1),
-            contents = '',
-            includes = '';
-        contents = DocumentManager.getCurrentDocument().getText();
-        includes = parseIncludes(contents, dir);
-        var data = { filename : entry.name,
-					 fullpath : entry.fullPath,
-                     title : 'Jasmine test - ' + entry.name,
-                     includes : includes,
-                     contents : DocumentManager.getCurrentDocument().getText()
-                   };
-	    if (data.contents.match(/define\(/)) {
-			var filepath = { fullpath: entry.fullPath };
-			var template = require("text!templates/jasmine_requirejs.html");
-        	var html = Mustache.render(template, data);
-	} else {
-			var template = require("text!templates/jasmine.html");
-        	var html = Mustache.render(template, data);
-		}
-
-        FileUtils.writeText(jasmineReportEntry, html).done(function () {
-            var report = window.open(jasmineReportEntry.fullPath);
-            report.focus();
+            dirEntry = new NativeFileSystem.DirectoryEntry(dir),
+            testName = entry.fullPath.substring(entry.fullPath.lastIndexOf("/") + 1),
+            testBase = testName.substring(0, testName.lastIndexOf('.')),
+            newTestName = testBase + (testFileIndex++) + ".js",
+            contents = DocumentManager.getCurrentDocument().getText(),
+            includes = parseIncludes(contents, dir),
+            relpath = entry.fullPath.substring(ProjectManager.getInitialProjectPath().length - 1),
+            jasmineTestName = dir + testBase + '/' + newTestName,
+            jasmineTestEntry = new NativeFileSystem.FileEntry(jasmineTestName),
+            jasmineHtmlName = dir + testBase + "/" + testBase + ".html",
+            jasmineHtmlEntry = new NativeFileSystem.FileEntry(jasmineHtmlName),
+            jasmineCss = require("text!templates/jasmine.css"),
+            jasmineCssEntry = new NativeFileSystem.FileEntry(dir + testBase + "/jasmine.css"),
+            jasmineJs = require("text!templates/jasmine.js"),
+            jasmineJsEntry = new NativeFileSystem.FileEntry(dir + testBase + "/jasmine.js"),
+            jasmineJsHtml = require("text!templates/jasmine-html.js"),
+            jasmineJsHtmlEntry = new NativeFileSystem.FileEntry(dir + testBase + "/jasmine-html.js"),
+            requireSrc = require("text!node/node_modules/jasmine-node/node_modules/requirejs/require.js"),
+            requireSrcEntry = new NativeFileSystem.FileEntry(dir + testBase + "/require.js");
+        var apiFile = contents.match(/require\('\.\/[A-Za-z0-9\-]+\.js/);
+        
+        
+        dirEntry.getDirectory(testBase, {create: true}, function () {
+            var data = {
+                    filename : entry.name,
+                    jasmineTest : newTestName,
+                    title : 'Jasmine test - ' + entry.name,
+                    includes : includes,
+                    contents : DocumentManager.getCurrentDocument().getText()
+                },
+                template,
+                html;
+            if (data.contents.match(/define\(/)) {
+                var filepath = { fullpath: entry.fullPath };
+                template = require("text!templates/jasmine_requirejs.html");
+                html = Mustache.render(template, data);
+            } else {
+                template = require("text!templates/jasmine.html");
+                html = Mustache.render(template, data);
+            }
+            FileUtils.writeText(jasmineTestEntry, contents).done(function () {
+                FileUtils.writeText(jasmineHtmlEntry, html).done(function () {
+                    FileUtils.writeText(jasmineCssEntry, jasmineCss).done(function () {
+                        FileUtils.writeText(jasmineJsEntry, jasmineJs).done(function () {
+                            FileUtils.writeText(requireSrcEntry, requireSrc).done(function () {
+                                FileUtils.writeText(jasmineJsHtmlEntry, jasmineJsHtml).done(function () {
+                                    if (apiFile) {
+                                        var apiFileName = apiFile[0].substring(11),
+                                            apiFileEntry = new NativeFileSystem.FileEntry(dir + apiFileName),
+                                            apiNewFileEntry = new NativeFileSystem.FileEntry(dir + testBase + '/' + apiFileName);
+                                        FileUtils.readAsText(apiFileEntry).done(function (text, modtime) {
+                                            FileUtils.writeText(apiNewFileEntry, text).done(function () {
+                                                var reportWin = window.open(jasmineHtmlEntry.fullPath);
+                                                reportWin.focus();
+                                            });
+                                        });
+                                    } else {
+                                        var reportWin = window.open(jasmineHtmlEntry.fullPath);
+                                        reportWin.focus();
+                                    }
+                                });
+                            });
+                        });
+                    });
+                });
+            });
         });
     }
 
@@ -149,10 +209,13 @@ define(function (require, exports, module) {
         if (entry === undefined) {
             entry = DocumentManager.getCurrentDocument();
         }
-        var f = entry.fullPath,
+        var dir = entry.fullPath.substring(0, entry.fullPath.lastIndexOf('/') + 1),
+            dirEntry = new NativeFileSystem.DirectoryEntry(dir),
             fname = DocumentManager.getCurrentDocument().filename,
             contents = DocumentManager.getCurrentDocument().getText(),
-            dir = entry.fullPath.substring(0, entry.fullPath.lastIndexOf('/') + 1),
+            testName = entry.fullPath.substring(entry.fullPath.lastIndexOf("/") + 1),
+            testBase = testName.substring(0, testName.lastIndexOf('.')),
+            qunitReportEntry    = new NativeFileSystem.FileEntry(dir + testBase + '/qUnitReport.html'),
             includes = parseIncludes(contents, dir);
         var data = { filename : entry.name,
                      title : 'QUnit test - ' + entry.name,
@@ -163,10 +226,12 @@ define(function (require, exports, module) {
         var template = require("text!templates/qunit.html");
         var html = Mustache.render(template, data);
         // write generated test report to file on disk
-        FileUtils.writeText(qunitReportEntry, html).done(function () {
-            // launch new window with generated report
-            var report = window.open(qunitReportEntry.fullPath);
-            report.focus();
+        dirEntry.getDirectory(dir + testBase, {create: true}, function () {
+            FileUtils.writeText(qunitReportEntry, html).done(function () {
+                // launch new window with generated report
+                var report = window.open(qunitReportEntry.fullPath);
+                report.focus();
+            });
         });
     }
 
@@ -288,7 +353,16 @@ define(function (require, exports, module) {
         }
         newWindow.focus();
     }
-
+    function viewHtml() {
+        var entry = ProjectManager.getSelectedItem();
+        if (entry === undefined) {
+            entry = DocumentManager.getCurrentDocument().file;
+        }
+        var path = entry.fullPath;
+        var w = window.open(path);
+        w.focus();
+    }
+    
     // Run File as shell script using node process spawn
     function runScript() {
         var entry = ProjectManager.getSelectedItem();
@@ -407,6 +481,8 @@ define(function (require, exports, module) {
         var functions = parseCurrentDocument(),
             fullpath = DocumentManager.getCurrentDocument().file.fullPath,
             filename = DocumentManager.getCurrentDocument().file.name,
+            contents = DocumentManager.getCurrentDocument().getText(),
+            userequire = contents.match(/define\w*\(/),
             i,
             j,
             fparamstr;
@@ -416,24 +492,48 @@ define(function (require, exports, module) {
             return;
         }
         var test = '// generated by xUnit ' + new Date() + '\n' +
-                   '// jasmine unit test for ' + filename + '\n' +
-                   '// brackets-xunit: includes=' + filename + '\n';
-        for (i = 0; i < functions.length; i++) {
-            fparamstr = '';
-            for (j = 0; j < functions[i].params.length; j++) {
-                if (j > 0) {
-                    fparamstr += ", ";
+                   '// jasmine unit test for ' + filename + '\n';
+        if (userequire) {
+            test += 'define(function (require, exports, module) {\n' +
+                    "    'use strict';\n" +
+                    "    var testapi = require('./" + filename + "');\n";
+            for (i = 0; i < functions.length; i++) {
+                fparamstr = '';
+                for (j = 0; j < functions[i].params.length; j++) {
+                    if (j > 0) {
+                        fparamstr += ", ";
+                    }
+                    fparamstr += functions[i].params[j];
                 }
-                fparamstr += functions[i].params[j];
+                test += '    describe' + '("test ' + functions[i].name + '(' + fparamstr + ')", function () {\n';
+                if (fparamstr !== '') {
+                    test += '        var ' + fparamstr + ';\n';
+                }
+                test += '        it("' + functions[i].name + '(' + fparamstr + ') === ?", function () {\n' +
+                        '            expect( testapi.' + functions[i].name + '(' + fparamstr + ')).toEqual("?");\n' +
+                        '        });\n' +
+                        '    });\n';
             }
-            test += 'describe' + '("test ' + functions[i].name + '(' + fparamstr + ')", function () {\n';
-            if (fparamstr !== '') {
-                test += '    var ' + fparamstr + ';\n';
+            test += '});\n';
+        } else {
+            test += '// brackets-xunit: includes=' + filename + '\n';
+            for (i = 0; i < functions.length; i++) {
+                fparamstr = '';
+                for (j = 0; j < functions[i].params.length; j++) {
+                    if (j > 0) {
+                        fparamstr += ", ";
+                    }
+                    fparamstr += functions[i].params[j];
+                }
+                test += 'describe' + '("test ' + functions[i].name + '(' + fparamstr + ')", function () {\n';
+                if (fparamstr !== '') {
+                    test += '    var ' + fparamstr + ';\n';
+                }
+                test += '    it("' + functions[i].name + '(' + fparamstr + ') === ?", function () {\n' +
+                        '        expect(' + functions[i].name + '(' + fparamstr + ')).toEqual("?");\n' +
+                        '    });\n' +
+                        '});\n';
             }
-            test += '    it("' + functions[i].name + '(' + fparamstr + ') === ?", function () {\n' +
-                    '        expect(' + functions[i].name + '(' + fparamstr + ')).toEqual("?");\n' +
-                    '    });\n' +
-                    '});\n';
         }
         createNewFile(fullpath, test, ".spec");
     }
@@ -562,17 +662,6 @@ define(function (require, exports, module) {
                     "The test file contained an error: " + err.toString()
                 );
             });
-    }
-
-    function chain() {
-        var functions = Array.prototype.slice.call(arguments, 0);
-        if (functions.length > 0) {
-            var firstFunction = functions.shift();
-            var firstPromise = firstFunction.call();
-            firstPromise.done(function () {
-                chain.apply(null, functions);
-            });
-        }
     }
 
     // converts time in ms to a more readable string format
@@ -787,7 +876,7 @@ define(function (require, exports, module) {
     //   test262: look at path for test directory then check for 
     //           ../tools/packaging/test262.py
     function determineFileType(fileEntry, text) {
-        if (fileEntry) {
+        if (fileEntry && fileEntry.fullPath && fileEntry.fullPath.match(/\.js$/)) {
             if (text.match(/brackets-xunit:\s*yui/i) !== null) {
                 return "yui";
             } else if (text.match(/define\(/i) && text.match(/describe\s*\(/)) {
@@ -808,13 +897,16 @@ define(function (require, exports, module) {
                 return "jasmine";
             } else if (text.match(/test\s*\(/) && text.match(/ok\s*\(/)) {
                 return "qunit";
-            } else if (text.match(/^#!/) !== null) {
-                return "script";
-            } else if (fileEntry.fullPath.match(/\.js$/)) {
+            } else {
                 return "generate";
             }
+        } else if (text.match(/^#!/) !== null) {
+            return "script";
+        } else if (fileEntry && fileEntry.fullPath && fileEntry.fullPath.match(/\.html$/)) {
+            return "html";
+        } else {
+            return "unknown";
         }
-        return "unknown";
     }
     // on click check if file matches a test type and add context menuitem
     function checkFileTypes(menu, entry, text) {
@@ -837,6 +929,8 @@ define(function (require, exports, module) {
             menu.addMenuItem(GENERATE_JASMINE_CMD, "", Menus.LAST);
             menu.addMenuItem(GENERATE_QUNIT_CMD, "", Menus.LAST);
             menu.addMenuItem(GENERATE_YUI_CMD, "", Menus.LAST);
+        } else if (type === "html") {
+            menu.addMenuItem(VIEWHTML_CMD, "", Menus.LAST);
         } else if (commands.indexOf("test262_cmd") > -1) {
             if (type === "test262") {
                 menu.addMenuItem(TEST262TEST_CMD, "", Menus.LAST);
@@ -854,7 +948,7 @@ define(function (require, exports, module) {
     }
 
     // Register commands as right click menu items
-    commands = [ YUITEST_CMD, JASMINETEST_CMD, QUNITTEST_CMD, SCRIPT_CMD, NODETEST_CMD, GENERATE_JASMINE_CMD, GENERATE_QUNIT_CMD, GENERATE_YUI_CMD ];
+    commands = [ YUITEST_CMD, JASMINETEST_CMD, QUNITTEST_CMD, SCRIPT_CMD, NODETEST_CMD, GENERATE_JASMINE_CMD, GENERATE_QUNIT_CMD, GENERATE_YUI_CMD, VIEWHTML_CMD ];
     CommandManager.register("Run YUI Unit Test", YUITEST_CMD, runYUI);
     CommandManager.register("Run Jasmine xUnit Test", JASMINETEST_CMD, runJasmine);
     CommandManager.register("Run QUnit xUnit Test", QUNITTEST_CMD, runQUnit);
@@ -863,6 +957,7 @@ define(function (require, exports, module) {
     CommandManager.register("Generate Jasmine xUnit Test", GENERATE_JASMINE_CMD, generateJasmineTest);
     CommandManager.register("Generate Qunit xUnit Test", GENERATE_QUNIT_CMD, generateQunitTest);
     CommandManager.register("Generate YUI xUnit Test", GENERATE_YUI_CMD, generateYuiTest);
+    CommandManager.register("xUnit View html", VIEWHTML_CMD, viewHtml);
 
     FileUtils.readAsText(configEntry)
         .done(function (text, readTimestamp) {

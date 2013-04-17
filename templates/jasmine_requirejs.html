@@ -3,35 +3,30 @@
 <html>
 <head>
   <title>Jasmine Test - {{filename}}</title>
-  <link rel="stylesheet" type="text/css" href="../templates/jasmine.css">
-  <script type="text/javascript" src="../templates/jasmine.js"></script>
-  <script type="text/javascript" src="../templates/jasmine-html.js"></script>
-  <script type="text/javascript" src="../node/node_modules/jasmine-node/node_modules/requirejs/require.js"></script>
-
-  {{{includes}}}
+  <link rel="stylesheet" type="text/css" href="jasmine.css">
+  <script type="text/javascript" src="jasmine.js"></script>
+  <script type="text/javascript" src="jasmine-html.js"></script>
+  <script type="text/javascript" src="require.js"></script>
 </head>
 <body>
-
 <script type="text/javascript" >
-
-	 var load_test = require(['{{{fullpath}}}']);
-	 var jasmineEnv = jasmine.getEnv();
-	 jasmineEnv.updateInterval = 1000;
+    require(['./{{jasmineTest}}']);
+	var jasmineEnv = jasmine.getEnv();
+	jasmineEnv.updateInterval = 1000;
 	
-	 var htmlReporter = new jasmine.HtmlReporter();
+	var htmlReporter = new jasmine.HtmlReporter();
 	
-	 jasmineEnv.addReporter(htmlReporter);
-	 jasmineEnv.specFilter = function(spec) {  
-	   return htmlReporter.specFilter(spec);
-	 };
+	jasmineEnv.addReporter(htmlReporter);
+	jasmineEnv.specFilter = function(spec) {  
+	    return htmlReporter.specFilter(spec);
+	};
 	
-	 var currentWindowOnload = window.setTimeout( function(){execJasmine()},100);
+	var currentWindowOnload = window.setTimeout( function(){execJasmine()},100);
 	
-	 function execJasmine() {
-	   jasmineEnv.execute();
-	 }
+	function execJasmine() {
+	    jasmineEnv.execute();
+	}
  
- </script>
-
+</script>
 </body>
 </html>

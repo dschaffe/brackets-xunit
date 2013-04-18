@@ -19,6 +19,8 @@ Installation
 Usage
 =====
 
+Here is a 5 minute youtube video: http://www.youtube.com/watch?v=lcxx49RoZP8
+
 The goal is for the xunit extension is to make creating and maintaining unit tests easier.   The extension will detect several types of javascript
 unit tests and provide functionality to run the unit test from the context menu by right clicking on a file in the project sidebar.  The extension
 also generates skeleton unit tests for a file when the user select Generate xunit test from the context menu.

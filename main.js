@@ -207,7 +207,7 @@ define(function (require, exports, module) {
     function runQUnit() {
         var entry = ProjectManager.getSelectedItem();
         if (entry === undefined) {
-            entry = DocumentManager.getCurrentDocument();
+            entry = DocumentManager.getCurrentDocument().file;
         }
         var dir = entry.fullPath.substring(0, entry.fullPath.lastIndexOf('/') + 1),
             dirEntry = new NativeFileSystem.DirectoryEntry(dir),

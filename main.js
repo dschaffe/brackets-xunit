@@ -75,7 +75,7 @@ define(function (require, exports, module) {
  
     function parseIncludes(contents, dir) {
         var includes = '';
-        if (contents.match(/brackets-xunit:\s*includes=/)) {
+        if (contents && contents.match(/brackets-xunit:\s*includes=/)) {
             var includestr = contents.match(/brackets-xunit:\s*includes=[A-Za-z0-9,\._\-\/]*/)[0];
             includestr = includestr.substring(includestr.indexOf('=') + 1);
             var includedata = includestr.split(',');
@@ -669,19 +669,28 @@ define(function (require, exports, module) {
     function formatTime(ms) {
         var result = "",
             secs = ms / 1000;
-        if (secs > 60 * 60 * 24) {
+        if (secs >= 60 * 60 * 24 * 365) {
+            result = (Math.floor(secs / (60 * 60 * 24 * 365))) + "y ";
+            secs = secs % (60 * 60 * 24 * 365);
+        }
+        if (secs >= 60 * 60 * 24) {
             result = (Math.floor(secs / (60 * 60 * 24))) + "d ";
             secs = secs % (60 * 60 * 24);
         }
-        if (secs > 60 * 60) {
+        if (secs >= 60 * 60) {
             result = result + (Math.floor(secs / (60 * 60))) + "h ";
             secs = secs % (60 * 60);
         }
-        if (secs > 60) {
+        if (secs >= 60) {
             result = result + (Math.floor(secs / 60)) + "m ";
             secs = secs % 60;
         }
-        result = result + Math.round(10 * secs) / 10 + "s";
+        if (result === "" || secs > 0) {
+            result = result + Math.round(10 * secs) / 10 + "s";
+        }
+        if (result[result.length - 1] === " ") {
+            result = result.substring(0, result.length - 1);
+        }
         return result;
     }
 
@@ -876,7 +885,9 @@ define(function (require, exports, module) {
     //   test262: look at path for test directory then check for 
     //           ../tools/packaging/test262.py
     function determineFileType(fileEntry, text) {
-        if (fileEntry && fileEntry.fullPath && fileEntry.fullPath.match(/\.js$/)) {
+        if (text && text.match(/^#!/) !== null) {
+            return "script";
+        } else if (text && fileEntry && fileEntry.fullPath && fileEntry.fullPath.match(/\.js$/)) {
             if (text.match(/brackets-xunit:\s*yui/i) !== null) {
                 return "yui";
             } else if (text.match(/define\(/i) && text.match(/describe\s*\(/)) {
@@ -891,17 +902,15 @@ define(function (require, exports, module) {
                 return "qunit";
             } else if (text.match(/brackets-xunit:\s*test262/i) !== null) {
                 return "test262";
-            } else if (text.match(/YUI\s*\(/) && text.match(/Test\.Runner\.run\s*\(/)) {
-                return "yui";
             } else if (text.match(/describe\s*\(/) && text.match(/it\s*\(/)) {
                 return "jasmine";
+            } else if (text.match(/YUI\s*\(/) && text.match(/Test\.Runner\.run\s*\(/)) {
+                return "yui";
             } else if (text.match(/test\s*\(/) && text.match(/ok\s*\(/)) {
                 return "qunit";
             } else {
                 return "generate";
             }
-        } else if (text.match(/^#!/) !== null) {
-            return "script";
         } else if (fileEntry && fileEntry.fullPath && fileEntry.fullPath.match(/\.html$/)) {
             return "html";
         } else {
@@ -995,4 +1004,8 @@ define(function (require, exports, module) {
             text = DocumentManager.getCurrentDocument().getText();
         checkFileTypes(workingsetMenu, selectedEntry, text);
     });
+    exports.formatTime = formatTime;
+    exports.checkFileTypes = checkFileTypes;
+    exports.determineFileType = determineFileType;
+    exports.parseIncludes = parseIncludes;
 });

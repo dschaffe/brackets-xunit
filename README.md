@@ -60,6 +60,6 @@ Limitations and Future Enhancements
 Change Log
 =========
 
-03-21-2013 Initial commit
-04-01-2013 added qunit, test262, and script support
-04-17-2013 added test generation support for jasmine, qunit, yui.  jasmine supports AMD/require syntax
+* 03-21-2013 Initial commit
+* 04-01-2013 added qunit, test262, and script support
+* 04-17-2013 added test generation support for jasmine, qunit, yui.  jasmine supports AMD/require syntax

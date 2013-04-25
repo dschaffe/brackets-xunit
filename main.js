@@ -934,25 +934,32 @@ define(function (require, exports, module) {
             menu.addMenuItem(SCRIPT_CMD, "", Menus.LAST);
         } else if (type === "node") {
             menu.addMenuItem(NODETEST_CMD, "", Menus.LAST);
-        } else if (type === "generate") {
-            menu.addMenuItem(GENERATE_JASMINE_CMD, "", Menus.LAST);
-            menu.addMenuItem(GENERATE_QUNIT_CMD, "", Menus.LAST);
-            menu.addMenuItem(GENERATE_YUI_CMD, "", Menus.LAST);
         } else if (type === "html") {
             menu.addMenuItem(VIEWHTML_CMD, "", Menus.LAST);
-        } else if (commands.indexOf("test262_cmd") > -1) {
-            if (type === "test262") {
-                menu.addMenuItem(TEST262TEST_CMD, "", Menus.LAST);
-            } else {
+        }
+        if (commands.indexOf("test262_cmd") > -1) {
+            if (type === "unknown" || type === "generate") {
                 var promise = determineTest262FileType(entry.fullPath);
                 if (promise !== undefined) {
                     promise.done(function (path) {
                         if (path !== undefined) {
                             menu.addMenuItem(TEST262TEST_CMD, "", Menus.LAST);
+                        } else if (type === "generate") {
+                            menu.addMenuItem(GENERATE_JASMINE_CMD, "", Menus.LAST);
+                            menu.addMenuItem(GENERATE_QUNIT_CMD, "", Menus.LAST);
+                            menu.addMenuItem(GENERATE_YUI_CMD, "", Menus.LAST);
                         }
                     });
+                } else if (type === "generate") {
+                    menu.addMenuItem(GENERATE_JASMINE_CMD, "", Menus.LAST);
+                    menu.addMenuItem(GENERATE_QUNIT_CMD, "", Menus.LAST);
+                    menu.addMenuItem(GENERATE_YUI_CMD, "", Menus.LAST);
                 }
             }
+        } else if (type === "generate") {
+            menu.addMenuItem(GENERATE_JASMINE_CMD, "", Menus.LAST);
+            menu.addMenuItem(GENERATE_QUNIT_CMD, "", Menus.LAST);
+            menu.addMenuItem(GENERATE_YUI_CMD, "", Menus.LAST);
         }
     }
 
@@ -993,7 +1000,7 @@ define(function (require, exports, module) {
     $(projectMenu).on("beforeContextMenuOpen", function (evt) {
         var selectedEntry = ProjectManager.getSelectedItem(),
             text = '';
-        if (selectedEntry.fullPath === DocumentManager.getCurrentDocument().file.fullPath) {
+        if (selectedEntry && selectedEntry.fullPath && selectedEntry.fullPath === DocumentManager.getCurrentDocument().file.fullPath) {
             text = DocumentManager.getCurrentDocument().getText();
         }
         checkFileTypes(projectMenu, selectedEntry, text);

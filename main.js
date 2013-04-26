@@ -801,7 +801,7 @@ define(function (require, exports, module) {
         $(nodeConnection).on("process.stdout", function (event, result) {
             var pid = result.pid,
                 data = result.data;
-            data = data.replace(/\n/g, '<br>');
+            data = data.replace(/\n/g, '<br>').replace(/\r/g, '<br>');
             if (_windows.hasOwnProperty(pid) === false) {
                 showError("Process Error", "there is no window with pid=" + pid);
             } else {

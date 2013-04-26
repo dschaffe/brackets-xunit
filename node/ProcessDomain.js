@@ -27,6 +27,7 @@
     "use strict";
     
     var spawn = require("child_process").spawn;
+    var path = require("path");
 
     var _sessions = {},
         domainManager,
@@ -37,7 +38,7 @@
             parameters = info.args,
             directory = info.directory,
             shell = info.shells,
-            cacheTime = info.cacheTime;
+            cacheTime = info.cacheTime,
             env = info.env;
         if (cacheTime === undefined) {
             cacheTime = cacheTimeDefault;
@@ -50,6 +51,11 @@
         }
         if (directory === undefined) {
             directory = command.substring(0, command.lastIndexOf('/'));
+        }
+        directory = directory.replace(/\//g, path.sep);
+        var i;
+        for (i = 0; i < parameters.length; i++) {
+            parameters[i] = parameters[i].replace(/\//g, path.sep);
         }
         var session = spawn(command, parameters, { cwd: directory });
         _sessions[session.pid] = {session: session, lastSentTime: Number(new Date()), cacheData: '', cacheTime: cacheTime};

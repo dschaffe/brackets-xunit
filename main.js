@@ -351,10 +351,10 @@ define(function (require, exports, module) {
         for (i = 0; i < test262shells.length; i++) {
             params = [test262, "--full-summary", "--command", test262shells[i].path, test];
             env = {};
-            if (test262shells[i].env !== null) {
+            if (test262shells[i].env !== undefined) {
                 env = test262shells[i].env;
             }
-            nodeConnection.domains.process.spawnSession({executable: "python", args: params, directory: base, shells: test262shells[i], cacheTime: 3000}).done(spawned);
+            nodeConnection.domains.process.spawnSession({executable: "python", args: params, directory: base, env: env, shells: test262shells[i], cacheTime: 3000}).done(spawned);
         }
         newWindow.focus();
     }

@@ -251,7 +251,8 @@ define(function (require, exports, module) {
         var teststr = test,
             i,
             shell,
-            params;
+            params,
+            env;
         if (test === '') {
             teststr = 'all';
         }
@@ -348,8 +349,12 @@ define(function (require, exports, module) {
             entrypoint.appendChild(stderrsection);
         };
         for (i = 0; i < test262shells.length; i++) {
-            params = ["--full-summary", "--command", test262shells[i].path, test];
-            nodeConnection.domains.process.spawnSession({executable: test262, args: params, directory: base, shells: test262shells[i], cacheTime: 3000}).done(spawned);
+            params = [test262, "--full-summary", "--command", test262shells[i].path, test];
+            env = {};
+            if (test262shells[i].env !== null) {
+                env = test262shells[i].env;
+            }
+            nodeConnection.domains.process.spawnSession({executable: "python", args: params, directory: base, shells: test262shells[i], cacheTime: 3000}).done(spawned);
         }
         newWindow.focus();
     }
@@ -1000,7 +1005,7 @@ define(function (require, exports, module) {
     $(projectMenu).on("beforeContextMenuOpen", function (evt) {
         var selectedEntry = ProjectManager.getSelectedItem(),
             text = '';
-        if (selectedEntry && selectedEntry.fullPath && selectedEntry.fullPath === DocumentManager.getCurrentDocument().file.fullPath) {
+        if (selectedEntry && selectedEntry.fullPath && DocumentManager.getCurrentDocument() !== null && selectedEntry.fullPath === DocumentManager.getCurrentDocument().file.fullPath) {
             text = DocumentManager.getCurrentDocument().getText();
         }
         checkFileTypes(projectMenu, selectedEntry, text);

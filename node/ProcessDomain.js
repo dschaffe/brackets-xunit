@@ -38,11 +38,15 @@
             directory = info.directory,
             shell = info.shells,
             cacheTime = info.cacheTime;
+            env = info.env;
         if (cacheTime === undefined) {
             cacheTime = cacheTimeDefault;
         }
         if (parameters === undefined) {
             parameters = [];
+        }
+        if (env === undefined) {
+            env = {};
         }
         if (directory === undefined) {
             directory = command.substring(0, command.lastIndexOf('/'));

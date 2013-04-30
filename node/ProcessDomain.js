@@ -37,7 +37,7 @@
             parameters = info.args,
             directory = info.directory,
             shell = info.shells,
-            cacheTime = info.cacheTime;
+            cacheTime = info.cacheTime,
             env = {};
         if (cacheTime === undefined) {
             cacheTime = cacheTimeDefault;

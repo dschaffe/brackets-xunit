@@ -234,8 +234,6 @@ define(function (require, exports, module) {
             });
         });
     }
-
-    // Execute test262 test
     function runTest262() {
         var entry = ProjectManager.getSelectedItem();
         if (entry === undefined) {
@@ -252,7 +250,9 @@ define(function (require, exports, module) {
             i,
             shell,
             params,
-            env;
+            env,
+            cacheTime,
+            python;
         if (test === '') {
             teststr = 'all';
         }
@@ -263,7 +263,8 @@ define(function (require, exports, module) {
         newWindow.document.write(html);
         var spawned = function (data) {
             var pid = data[0],
-                shell = data[2].name + " : " + data[2].path;
+                shell = data[2].name + " : " + data[2].path,
+                errorMsg = data[3];
             _windows[pid] = {window: newWindow, startTime: new Date(), type: "test262", passes: 0, fails: 0, expfails: 0, current: '', done: false };
             var doc = newWindow.document;
             var entrypoint = doc.getElementById("entrypoint");
@@ -346,17 +347,53 @@ define(function (require, exports, module) {
             stderr.id = "stderr" + pid;
             stderrsection.appendChild(stderrlabel);
             stderrsection.appendChild(stderr);
+            if (errorMsg !== '') {
+                stderrsection.display = "block";
+                stderrsection.innerHTML += errorMsg;
+                exitcodeText.innerHTML = "finished with exit code -1";
+            }
             entrypoint.appendChild(stderrsection);
         };
         for (i = 0; i < test262shells.length; i++) {
             params = [test262, "--full-summary", "--command", test262shells[i].path, test];
             env = {};
-            if (test262shells[i].env !== null) {
+            if (test262shells[i].env !== undefined) {
                 env = test262shells[i].env;
             }
-            nodeConnection.domains.process.spawnSession({executable: "python", args: params, directory: base, shells: test262shells[i], cacheTime: 3000}).done(spawned);
+            cacheTime = 3000;
+            if (test262shells[i].cacheTime !== undefined) {
+                cacheTime = test262shells[i].cacheTime;
+            }
+            python = "python";
+            if (test262shells[i].python !== undefined) {
+                python = test262shells[i].python;
+            }
+            nodeConnection.domains.process.spawnSession({executable: python, args: params, directory: base, env: env, shells: test262shells[i], cacheTime: cacheTime}).done(spawned);
         }
         newWindow.focus();
+    }
+    function runTest262Setup() {
+        FileUtils.readAsText(configEntry)
+            .done(function (text, readTimestamp) {
+                try {
+                    config = JSON.parse(text);
+                    if (config.hasOwnProperty("commands") && config.commands[0].name !== '<description>') {
+                        test262shells = config.commands;
+                        runTest262();
+                    } else {
+                        test262shells = {};
+                        console.log("[brackets-xunit]: " + moduledir + "/config.js commands property is not set");
+                        showError("xUnit test262 configuration", "Error: in file " + moduledir + "/config.js the 'commands' property is not set.");
+                    }
+                } catch (e) {
+                    console.log("[brackets-xunit]: " + moduledir + "/config.js could not parse config info");
+                    showError("xUnit test262 configuration", "Error: file " + moduledir + "/config.js could not be parsed as JSON.");
+                }
+            })
+            .fail(function (error) {
+                console.log("[brackets-xunit]: could not load file " + moduledir + "/config.js");
+                showError("Test262 Config", "Error: could not load file " + moduledir + "/config.js");
+            });
     }
     function viewHtml() {
         var entry = ProjectManager.getSelectedItem();
@@ -801,7 +838,7 @@ define(function (require, exports, module) {
         $(nodeConnection).on("process.stdout", function (event, result) {
             var pid = result.pid,
                 data = result.data;
-            data = data.replace(/\n/g, '<br>');
+            data = data.replace(/\r\n/g, '<br>').replace(/\n/g, '<br>');
             if (_windows.hasOwnProperty(pid) === false) {
                 showError("Process Error", "there is no window with pid=" + pid);
             } else {
@@ -831,7 +868,7 @@ define(function (require, exports, module) {
         $(nodeConnection).on("process.stderr", function (event, result) {
             var pid = result.pid,
                 data = result.data;
-            data = data.replace(/\n/g, '<br>');
+            data = data.replace(/\r\n/g, '<br>').replace(/\n/g, '<br>');
             if (_windows.hasOwnProperty(pid) === false) {
                 showError("Process Error", "there is no window with pid=" + pid);
             } else {
@@ -928,6 +965,9 @@ define(function (require, exports, module) {
         for (i = 0; i < commands.length; i++) {
             menu.removeMenuItem(commands[i]);
         }
+        if (entry === null) {
+            return "unknown";
+        }
         var type = determineFileType(entry, text);
         if (type === "yui") {
             menu.addMenuItem(YUITEST_CMD, "", Menus.LAST);
@@ -942,34 +982,28 @@ define(function (require, exports, module) {
         } else if (type === "html") {
             menu.addMenuItem(VIEWHTML_CMD, "", Menus.LAST);
         }
-        if (commands.indexOf("test262_cmd") > -1) {
-            if (type === "unknown" || type === "generate") {
-                var promise = determineTest262FileType(entry.fullPath);
-                if (promise !== undefined) {
-                    promise.done(function (path) {
-                        if (path !== undefined) {
-                            menu.addMenuItem(TEST262TEST_CMD, "", Menus.LAST);
-                        } else if (type === "generate") {
-                            menu.addMenuItem(GENERATE_JASMINE_CMD, "", Menus.LAST);
-                            menu.addMenuItem(GENERATE_QUNIT_CMD, "", Menus.LAST);
-                            menu.addMenuItem(GENERATE_YUI_CMD, "", Menus.LAST);
-                        }
-                    });
-                } else if (type === "generate") {
-                    menu.addMenuItem(GENERATE_JASMINE_CMD, "", Menus.LAST);
-                    menu.addMenuItem(GENERATE_QUNIT_CMD, "", Menus.LAST);
-                    menu.addMenuItem(GENERATE_YUI_CMD, "", Menus.LAST);
-                }
+        if (type === "unknown" || type === "generate") {
+            var promise = determineTest262FileType(entry.fullPath);
+            if (promise !== undefined) {
+                promise.done(function (path) {
+                    if (path !== undefined) {
+                        menu.addMenuItem(TEST262TEST_CMD, "", Menus.LAST);
+                    } else if (type === "generate") {
+                        menu.addMenuItem(GENERATE_JASMINE_CMD, "", Menus.LAST);
+                        menu.addMenuItem(GENERATE_QUNIT_CMD, "", Menus.LAST);
+                        menu.addMenuItem(GENERATE_YUI_CMD, "", Menus.LAST);
+                    }
+                });
+            } else if (type === "generate") {
+                menu.addMenuItem(GENERATE_JASMINE_CMD, "", Menus.LAST);
+                menu.addMenuItem(GENERATE_QUNIT_CMD, "", Menus.LAST);
+                menu.addMenuItem(GENERATE_YUI_CMD, "", Menus.LAST);
             }
-        } else if (type === "generate") {
-            menu.addMenuItem(GENERATE_JASMINE_CMD, "", Menus.LAST);
-            menu.addMenuItem(GENERATE_QUNIT_CMD, "", Menus.LAST);
-            menu.addMenuItem(GENERATE_YUI_CMD, "", Menus.LAST);
         }
     }
 
     // Register commands as right click menu items
-    commands = [ YUITEST_CMD, JASMINETEST_CMD, QUNITTEST_CMD, SCRIPT_CMD, NODETEST_CMD, GENERATE_JASMINE_CMD, GENERATE_QUNIT_CMD, GENERATE_YUI_CMD, VIEWHTML_CMD ];
+    commands = [ YUITEST_CMD, JASMINETEST_CMD, QUNITTEST_CMD, SCRIPT_CMD, NODETEST_CMD, GENERATE_JASMINE_CMD, GENERATE_QUNIT_CMD, GENERATE_YUI_CMD, VIEWHTML_CMD, TEST262TEST_CMD ];
     CommandManager.register("Run YUI Unit Test", YUITEST_CMD, runYUI);
     CommandManager.register("Run Jasmine xUnit Test", JASMINETEST_CMD, runJasmine);
     CommandManager.register("Run QUnit xUnit Test", QUNITTEST_CMD, runQUnit);
@@ -979,27 +1013,7 @@ define(function (require, exports, module) {
     CommandManager.register("Generate Qunit xUnit Test", GENERATE_QUNIT_CMD, generateQunitTest);
     CommandManager.register("Generate YUI xUnit Test", GENERATE_YUI_CMD, generateYuiTest);
     CommandManager.register("xUnit View html", VIEWHTML_CMD, viewHtml);
-
-    FileUtils.readAsText(configEntry)
-        .done(function (text, readTimestamp) {
-            try {
-                config = JSON.parse(text);
-                if (config.hasOwnProperty("commands") && config.commands[0].name !== '<description>') {
-                    commands.push(TEST262TEST_CMD);
-                    test262shells = config.commands;
-                    CommandManager.register("Run test262 xUnit Test", TEST262TEST_CMD, function () {
-                        runTest262();
-                    });
-                } else {
-                    console.log("[brackets-xunit]: " + moduledir + "/config.js commands property is not set");
-                }
-            } catch (e) {
-                console.log("[brackets-xunit]: " + moduledir + "/config.js could not parse config info");
-            }
-        })
-        .fail(function (error) {
-            console.log("[brackets-xunit]: could not load file " + moduledir + "/config.js");
-        });
+    CommandManager.register("Run test262 xUnit Test", TEST262TEST_CMD, runTest262Setup);
 
     // Determine type of test for selected item in project
     $(projectMenu).on("beforeContextMenuOpen", function (evt) {

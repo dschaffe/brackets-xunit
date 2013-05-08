@@ -28,7 +28,7 @@ also generates skeleton unit tests for a file when the user select Generate xuni
 Implementation Notes
 ============
 
-Currently supports jasmine, YUI3, qunit, and test262.  The script detects the type by looking for "brackets-xunit: <type>" where <type> is 
+Currently supports jasmine, YUI3, and qunit.  The script detects the type by looking for "brackets-xunit: <type>" where <type> is 
 jasmine, yui, qunit, and test262.  If no type tag exists the extension looks for patterns to determine if the file is of a particular type.  
 For example if a file contains describe() and it() functions the Run jasmine xunit test menu item appears.  
 
@@ -47,9 +47,12 @@ In the generated html the following is added into the head section based upon th
 
 Let me know if you have any suggestions or issues.  Contact me at: dschaffe@adobe.com.
 
-The test262 support http://test262.ecmascript.org/ detects if a test is within the test262 directory structure and runs test262.py on the
-selected test or directory.  The output is shown in a new window.  To use the test262 functionality edit config.js and setup one or more
-javascript shells to use when running tests.
+The test262 support was moved into a separate extension https://github.com/dschaffe/brackets-test262.
+
+To disable the brackets-xunit menu items for a project, create a config.js in the project root directory containing:
+   {
+       'brackets-xunit' : 'disable'
+   }
 
 Limitations and Future Enhancements
 ============

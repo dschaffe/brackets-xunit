@@ -144,9 +144,6 @@ define(function (require, exports, module) {
         it("determineFileType(new NativeFileSystem.FileEntry('test.js','brackets-xunit: '+'qunit') === 'qunit'", function () {
             expect(testapi.determineFileType(new NativeFileSystem.FileEntry('test.js'),'\n\n\nbrackets-xunit:' + '    qunit')).toEqual("qunit");
         });
-        it("determineFileType(new NativeFileSystem.FileEntry('test.js','brackets-xunit: '+'test262') === 'test262'", function () {
-            expect(testapi.determineFileType(new NativeFileSystem.FileEntry('test.js'),'\n\n\nbrackets-xunit:' + '    test262')).toEqual("test262");
-        });
         it("determineFileType(new NativeFileSystem.FileEntry('test.js','describe() it()' === 'jasmine'", function () {
             expect(testapi.determineFileType(new NativeFileSystem.FileEntry('test.js'),'describe() it()')).toEqual("jasmine");
         });

@@ -41,8 +41,6 @@ define(function (require, exports, module) {
         FileViewController  = brackets.getModule("project/FileViewController");
 
     var moduledir           = FileUtils.getNativeModuleDirectoryPath(module),
-        configEntry         = new NativeFileSystem.FileEntry(moduledir + '/config.js'),
-        config              = {},
         templateEntry       = new NativeFileSystem.FileEntry(moduledir + '/html/jasmineReportTemplate.html'),
         reportJasNodeEntry  = new NativeFileSystem.FileEntry(moduledir + '/node/reports/jasmineReport.html'),
         COMMAND_ID          = "BracketsXUnit.BracketsXUnit",
@@ -50,7 +48,6 @@ define(function (require, exports, module) {
         YUITEST_CMD         = "yuitest_cmd",
         JASMINETEST_CMD     = "jasminetest_cmd",
         QUNITTEST_CMD       = "qunit_cmd",
-        TEST262TEST_CMD     = "test262_cmd",
         SCRIPT_CMD          = "script_cmd",
         NODETEST_CMD        = "nodetest_cmd",
         GENERATE_JASMINE_CMD = "generate_jasmine_cmd",
@@ -60,7 +57,6 @@ define(function (require, exports, module) {
         projectMenu         = Menus.getContextMenu(Menus.ContextMenuIds.PROJECT_MENU),
         workingsetMenu      = Menus.getContextMenu(Menus.ContextMenuIds.WORKING_SET_MENU),
         nodeConnection      = new NodeConnection(),
-        test262shells       = [],
         _windows            = {},
         testFileIndex       = 0;
 
@@ -233,167 +229,6 @@ define(function (require, exports, module) {
                 report.focus();
             });
         });
-    }
-    function runTest262() {
-        var entry = ProjectManager.getSelectedItem();
-        if (entry === undefined) {
-            entry = DocumentManager.getCurrentDocument().file;
-        }
-        var path = entry.fullPath,
-            base = path.substring(0, path.lastIndexOf('/test/')),
-            test262 = base + "/tools/packaging/test262.py",
-            test = '';
-        if (path.indexOf("/suite/") > -1) {
-            test = path.substring(path.indexOf("/suite/") + 7);
-        }
-        var teststr = test,
-            i,
-            shell,
-            params,
-            env,
-            cacheTime,
-            python;
-        if (test === '') {
-            teststr = 'all';
-        }
-        var template = require("text!templates/test262.html");
-        var html = Mustache.render(template, { tests: teststr,
-                                               title: "test262 - test/suite/" + test});
-        var newWindow = window.open("about:blank", null, "width=600,height=200");
-        newWindow.document.write(html);
-        var spawned = function (data) {
-            var pid = data[0],
-                shell = data[2].name + " : " + data[2].path,
-                errorMsg = data[3];
-            _windows[pid] = {window: newWindow, startTime: new Date(), type: "test262", passes: 0, fails: 0, expfails: 0, current: '', done: false };
-            var doc = newWindow.document;
-            var entrypoint = doc.getElementById("entrypoint");
-            var shellLabel = doc.createElement("span");
-            shellLabel.className = "command";
-            shellLabel.innerHTML = "Shell";
-            shellLabel.style.marginTop = "10px";
-            entrypoint.appendChild(shellLabel);
-            
-            var shellText = doc.createElement("span");
-            shellText.className = "details";
-            shellText.innerHTML = shell;
-            entrypoint.appendChild(shellText);
-            entrypoint.appendChild(doc.createElement("br"));
-
-            var statusLabel = doc.createElement("span");
-            statusLabel.className = "command";
-            statusLabel.innerHTML = "Status";
-            entrypoint.appendChild(statusLabel);
-            
-            var statusText = doc.createElement("span");
-            statusText.className = "details";
-            statusText.id = "status" + pid;
-            statusText.innerHTML = "0 passes, 0 failures";
-            entrypoint.appendChild(statusText);
-            entrypoint.appendChild(doc.createElement("br"));
-            
-            var timeLabel = doc.createElement("span");
-            timeLabel.className = "command";
-            timeLabel.innerHTML = "Time";
-            entrypoint.appendChild(timeLabel);
-            
-            var timeText = doc.createElement("span");
-            timeText.className = "details";
-            timeText.id = "time" + pid;
-            timeText.innerHTML = "0s";
-            entrypoint.appendChild(timeText);
-            entrypoint.appendChild(doc.createElement("br"));
-
-            var exitcodeLabel = doc.createElement("span");
-            exitcodeLabel.className = "command";
-            exitcodeLabel.innerHTML = "Exit code";
-            entrypoint.appendChild(exitcodeLabel);
-            
-            var exitcodeText = doc.createElement("span");
-            exitcodeText.className = "details";
-            exitcodeText.id = "exitcode" + pid;
-            exitcodeText.innerHTML = "running with pid " + pid;
-            entrypoint.appendChild(exitcodeText);
-            entrypoint.appendChild(doc.createElement("br"));
-             
-            var stdoutsection = doc.createElement("span");
-            stdoutsection.id = "stdoutsection" + pid;
-            stdoutsection.className = "section";
-            stdoutsection.style.display = "block";
-            var stdoutlabel = doc.createElement("span");
-            stdoutlabel.className = "command";
-            stdoutlabel.appendChild(doc.createTextNode("output"));
-            var stdout = doc.createElement("div");
-            stdout.className = "content";
-            stdout.id = "stdout" + pid;
-            var out = "$ ";
-            for (i = 0; i < data[1].length; i++) {
-                out += data[1][i] + " ";
-            }
-            out += '<br>';
-            stdout.innerHTML = out;
-            stdoutsection.appendChild(stdoutlabel);
-            stdoutsection.appendChild(stdout);
-            entrypoint.appendChild(stdoutsection);
-            
-            var stderrsection = doc.createElement("span");
-            stderrsection.id = "stderrsection" + pid;
-            stderrsection.className = "section";
-            var stderrlabel = doc.createElement("span");
-            stderrlabel.className = "command";
-            stderrlabel.appendChild(doc.createTextNode("error"));
-            var stderr = doc.createElement("div");
-            stderr.className = "content";
-            stderr.id = "stderr" + pid;
-            stderrsection.appendChild(stderrlabel);
-            stderrsection.appendChild(stderr);
-            if (errorMsg !== '') {
-                stderrsection.display = "block";
-                stderrsection.innerHTML += errorMsg;
-                exitcodeText.innerHTML = "finished with exit code -1";
-            }
-            entrypoint.appendChild(stderrsection);
-        };
-        for (i = 0; i < test262shells.length; i++) {
-            params = [test262, "--full-summary", "--command", test262shells[i].path, test];
-            env = {};
-            if (test262shells[i].env !== undefined) {
-                env = test262shells[i].env;
-            }
-            cacheTime = 3000;
-            if (test262shells[i].cacheTime !== undefined) {
-                cacheTime = test262shells[i].cacheTime;
-            }
-            python = "python";
-            if (test262shells[i].python !== undefined) {
-                python = test262shells[i].python;
-            }
-            nodeConnection.domains.process.spawnSession({executable: python, args: params, directory: base, env: env, shells: test262shells[i], cacheTime: cacheTime}).done(spawned);
-        }
-        newWindow.focus();
-    }
-    function runTest262Setup() {
-        FileUtils.readAsText(configEntry)
-            .done(function (text, readTimestamp) {
-                try {
-                    config = JSON.parse(text);
-                    if (config.hasOwnProperty("commands") && config.commands[0].name !== '<description>') {
-                        test262shells = config.commands;
-                        runTest262();
-                    } else {
-                        test262shells = {};
-                        console.log("[brackets-xunit]: " + moduledir + "/config.js commands property is not set");
-                        showError("xUnit test262 configuration", "Error: in file " + moduledir + "/config.js the 'commands' property is not set.");
-                    }
-                } catch (e) {
-                    console.log("[brackets-xunit]: " + moduledir + "/config.js could not parse config info");
-                    showError("xUnit test262 configuration", "Error: file " + moduledir + "/config.js could not be parsed as JSON.");
-                }
-            })
-            .fail(function (error) {
-                console.log("[brackets-xunit]: could not load file " + moduledir + "/config.js");
-                showError("Test262 Config", "Error: could not load file " + moduledir + "/config.js");
-            });
     }
     function viewHtml() {
         var entry = ProjectManager.getSelectedItem();
@@ -664,30 +499,6 @@ define(function (require, exports, module) {
         createNewFile(fullpath, test, ".yui");
     }
 
-    // determine if file is test262
-    // look at file path for a test directory
-    // from the test directory go back one level and look
-    // for existance of tools/packaging/test262.py
-    // parameter: string of the test file name
-    // returns: a deferred object, result will be the base directory from where 
-    //          tools/packaging/test262.py can be added to find the python test runner
-    function determineTest262FileType(path) {
-        if (path.indexOf('/test/') === -1) {
-            return undefined;
-        }
-        if (path.substring(path.length - 5) === '/test') {
-            path += "/";
-        }
-        var base = path.substring(0, path.lastIndexOf('/test/'));
-        var deferred = $.Deferred();
-        NativeFileSystem.resolveNativeFileSystemPath(base + '/tools/packaging/test262.py', function (entry) {
-            deferred.resolve(base);
-        }, function (err) {
-            deferred.resolve();
-        });
-        return deferred.promise();
-    }
-
     // jasmine-node
     function runJasmineNode() {
         var entry = ProjectManager.getSelectedItem();
@@ -846,22 +657,9 @@ define(function (require, exports, module) {
                     _time = _windows[pid].startTime,
                     _type = _windows[pid].type,
                     elapsed = new Date() - _time;
-                if (_windows[pid].type === 'test262') {
-                    data = _windows[pid].current + data;
-                    var status = '';
-                    _windows[pid].current = data.substring(data.lastIndexOf("<br>") + 4);
-                    if (_windows[pid.current] !== '') {
-                        data = data.substring(0, data.lastIndexOf('<br>') + 4);
-                    }
-                    _window.document.getElementById("stdout" + pid).innerHTML += data;
-                    _window.document.getElementById("stdout" + pid).scrollTop = _window.document.getElementById("stdout" + pid).scrollHeight;
-                    _window.document.getElementById("time" + pid).innerHTML = formatTime(elapsed);
-                    processOutput(pid, data);
-                } else {
-                    _window.document.getElementById("stdout-section").style.display = "block";
-                    _window.document.getElementById("stdout").innerHTML += data;
-                    _window.document.getElementById("time").innerHTML = formatTime(elapsed);
-                }
+                _window.document.getElementById("stdout-section").style.display = "block";
+                _window.document.getElementById("stdout").innerHTML += data;
+                _window.document.getElementById("time").innerHTML = formatTime(elapsed);
             }
         });
                 
@@ -876,16 +674,9 @@ define(function (require, exports, module) {
                     _time = _windows[pid].startTime,
                     _type = _windows[pid].type,
                     elapsed = new Date() - _time;
-                if (_windows[pid].type === 'test262') {
-                    _window.document.getElementById("stderrsection" + pid).style.display = "block";
-                    _window.document.getElementById("stderr" + pid).innerHTML += data;
-                    _window.document.getElementById("time" + pid).innerHTML = formatTime(elapsed);
-                    _windows[pid].error += data;
-                } else {
-                    _window.document.getElementById("stderr-section").style.display = "block";
-                    _window.document.getElementById("stderr").innerHTML += data;
-                    _window.document.getElementById("time").innerHTML = formatTime(elapsed);
-                }
+                _window.document.getElementById("stderr-section").style.display = "block";
+                _window.document.getElementById("stderr").innerHTML += data;
+                _window.document.getElementById("time").innerHTML = formatTime(elapsed);
             }
         });
 
@@ -900,32 +691,42 @@ define(function (require, exports, module) {
                     _time = _windows[pid].startTime,
                     elapsed = new Date() - _time,
                     code = result.exitcode;
-                if (_windows[pid].type === 'test262') {
-                    var status = '';
-                    _window.document.getElementById("stdout" + pid).innerHTML += data;
-                    _window.document.getElementById("stdout" + pid).scrollTop = _window.document.getElementById("stdout" + pid).scrollHeight;
-                    _window.document.getElementById("exitcode" + pid).innerHTML = "finished with exit code " + code;
-                    _window.document.getElementById("time" + pid).innerHTML = formatTime(elapsed);
-                    processOutput(pid, data);
-                } else {
-                    _window.document.getElementById("stdout-section").style.display = "block";
-                    _window.document.getElementById("stdout").innerHTML += data;
-                    _window.document.getElementById("exitcode").innerHTML = "finished with exit code " + code;
-                    _window.document.getElementById("time").innerHTML = formatTime(elapsed);
-                }
+                _window.document.getElementById("stdout-section").style.display = "block";
+                _window.document.getElementById("stdout").innerHTML += data;
+                _window.document.getElementById("exitcode").innerHTML = "finished with exit code " + code;
+                _window.document.getElementById("time").innerHTML = formatTime(elapsed);
             }
         });
         chain(connect, loadJasmineDomain, loadProcessDomain);
     });
     
+    function readConfig() {
+        var result = new $.Deferred();
+        var root = ProjectManager.getProjectRoot(),
+            configEntry = new NativeFileSystem.FileEntry(root.fullPath + "config.js");
+        FileUtils.readAsText(configEntry).done(function (text, timestamp) {
+            try {
+                var config = JSON.parse(text);
+                if (config.hasOwnProperty('brackets-xunit') && config['brackets-xunit'] === 'disable') {
+                    result.reject('disabled');
+                }
+            } catch (e) {
+                console.log("[brackets-xunit] reading " + root.fullPath + "config.js Error " + e);
+            } finally {
+                return result.resolve('ok');
+            }
+        }).fail(function (error) {
+            return result.resolve('ok');
+        });
+        return result.promise();
+    }
+
     // determine if a file is a known test type
     // first look for brackets-xunit: [type], takes precedence
     // next look for distinguishing clues in the file:
     //   YUI: 'YUI(' and 'Test.runner.test'
     //   jasmine: 'describe' and 'it'
     //   QUnit: 'test()' and 'it()'
-    //   test262: look at path for test directory then check for 
-    //           ../tools/packaging/test262.py
     function determineFileType(fileEntry, text) {
         if (text && text.match(/^#!/) !== null) {
             return "script";
@@ -942,8 +743,6 @@ define(function (require, exports, module) {
                 return "jasmine";
             } else if (text.match(/brackets-xunit:\s*qunit/i) !== null) {
                 return "qunit";
-            } else if (text.match(/brackets-xunit:\s*test262/i) !== null) {
-                return "test262";
             } else if (text.match(/describe\s*\(/) && text.match(/it\s*\(/)) {
                 return "jasmine";
             } else if (text.match(/YUI\s*\(/) && text.match(/Test\.Runner\.run\s*\(/)) {
@@ -959,12 +758,14 @@ define(function (require, exports, module) {
             return "unknown";
         }
     }
-    // on click check if file matches a test type and add context menuitem
-    function checkFileTypes(menu, entry, text) {
+    function cleanMenu(menu) {
         var i;
         for (i = 0; i < commands.length; i++) {
             menu.removeMenuItem(commands[i]);
         }
+    }
+    // on click check if file matches a test type and add context menuitem
+    function checkFileTypes(menu, entry, text) {
         if (entry === null) {
             return "unknown";
         }
@@ -982,28 +783,15 @@ define(function (require, exports, module) {
         } else if (type === "html") {
             menu.addMenuItem(VIEWHTML_CMD, "", Menus.LAST);
         }
-        if (type === "unknown" || type === "generate") {
-            var promise = determineTest262FileType(entry.fullPath);
-            if (promise !== undefined) {
-                promise.done(function (path) {
-                    if (path !== undefined) {
-                        menu.addMenuItem(TEST262TEST_CMD, "", Menus.LAST);
-                    } else if (type === "generate") {
-                        menu.addMenuItem(GENERATE_JASMINE_CMD, "", Menus.LAST);
-                        menu.addMenuItem(GENERATE_QUNIT_CMD, "", Menus.LAST);
-                        menu.addMenuItem(GENERATE_YUI_CMD, "", Menus.LAST);
-                    }
-                });
-            } else if (type === "generate") {
-                menu.addMenuItem(GENERATE_JASMINE_CMD, "", Menus.LAST);
-                menu.addMenuItem(GENERATE_QUNIT_CMD, "", Menus.LAST);
-                menu.addMenuItem(GENERATE_YUI_CMD, "", Menus.LAST);
-            }
+        if (type === "generate") {
+            menu.addMenuItem(GENERATE_JASMINE_CMD, "", Menus.LAST);
+            menu.addMenuItem(GENERATE_QUNIT_CMD, "", Menus.LAST);
+            menu.addMenuItem(GENERATE_YUI_CMD, "", Menus.LAST);
         }
     }
 
     // Register commands as right click menu items
-    commands = [ YUITEST_CMD, JASMINETEST_CMD, QUNITTEST_CMD, SCRIPT_CMD, NODETEST_CMD, GENERATE_JASMINE_CMD, GENERATE_QUNIT_CMD, GENERATE_YUI_CMD, VIEWHTML_CMD, TEST262TEST_CMD ];
+    commands = [ YUITEST_CMD, JASMINETEST_CMD, QUNITTEST_CMD, SCRIPT_CMD, NODETEST_CMD, GENERATE_JASMINE_CMD, GENERATE_QUNIT_CMD, GENERATE_YUI_CMD, VIEWHTML_CMD];
     CommandManager.register("Run YUI Unit Test", YUITEST_CMD, runYUI);
     CommandManager.register("Run Jasmine xUnit Test", JASMINETEST_CMD, runJasmine);
     CommandManager.register("Run QUnit xUnit Test", QUNITTEST_CMD, runQUnit);
@@ -1013,7 +801,6 @@ define(function (require, exports, module) {
     CommandManager.register("Generate Qunit xUnit Test", GENERATE_QUNIT_CMD, generateQunitTest);
     CommandManager.register("Generate YUI xUnit Test", GENERATE_YUI_CMD, generateYuiTest);
     CommandManager.register("xUnit View html", VIEWHTML_CMD, viewHtml);
-    CommandManager.register("Run test262 xUnit Test", TEST262TEST_CMD, runTest262Setup);
 
     // Determine type of test for selected item in project
     $(projectMenu).on("beforeContextMenuOpen", function (evt) {
@@ -1022,13 +809,19 @@ define(function (require, exports, module) {
         if (selectedEntry && selectedEntry.fullPath && DocumentManager.getCurrentDocument() !== null && selectedEntry.fullPath === DocumentManager.getCurrentDocument().file.fullPath) {
             text = DocumentManager.getCurrentDocument().getText();
         }
-        checkFileTypes(projectMenu, selectedEntry, text);
+        cleanMenu(projectMenu);
+        readConfig().done(function () {
+            checkFileTypes(projectMenu, selectedEntry, text);
+        });
     });
     // Determine type of test for selected item in project
     $(workingsetMenu).on("beforeContextMenuOpen", function (evt) {
         var selectedEntry = DocumentManager.getCurrentDocument().file,
             text = DocumentManager.getCurrentDocument().getText();
-        checkFileTypes(workingsetMenu, selectedEntry, text);
+        cleanMenu(workingsetMenu);
+        readConfig.done(function () {
+            checkFileTypes(workingsetMenu, selectedEntry, text);
+        });
     });
     exports.formatTime = formatTime;
     exports.checkFileTypes = checkFileTypes;

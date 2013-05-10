@@ -366,9 +366,7 @@ define(function (require, exports, module) {
             test += '/*global YUI';
             break;
         }
-        
-        
-        fnames = "";
+
         for (i = 0; i < functions.length; i++) {
             fnames += ", " + functions[i].name;
         }

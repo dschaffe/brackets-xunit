@@ -354,7 +354,7 @@ define(function (require, exports, module) {
     }
     
     function generateGlobalDeclaration(type, test, functions) {
-        var fnames, i;
+        var fnames = '', i;
         switch (type) {
         case "jasmine":
             test += '/*global describe, it, expect';
@@ -405,11 +405,10 @@ define(function (require, exports, module) {
                 }
                 test += '    describe' + '("test ' + functions[i].name + '(' + fparamstr + ')", function () {\n';
                 if (fparamstr !== '') {
-                    test += '        "use strict";\n';
                     test += '        var ' + fparamstr + ';\n';
                 }
                 test += '        it("' + functions[i].name + '(' + fparamstr + ') === ?", function () {\n' +
-                        '            expect( testapi.' + functions[i].name + '(' + fparamstr + ')).toEqual("?");\n' +
+                        '            expect(testapi.' + functions[i].name + '(' + fparamstr + ')).toEqual("?");\n' +
                         '        });\n' +
                         '    });\n';
             }

@@ -9,9 +9,9 @@ Script on the context menu will invoke a new window containing the stdout and st
 Installation
 ===========
 
-1. Find your extensions folder by going to "Help -> Show Extensions Folder"
-2. Extract the .zip to your Brackets extension directory (extensions/user)
-3. Start Brackets and create a unit test in brackets, see the samples directory for examples
+1. Select File/Install Extension... from the Brackets main menu
+2. In the url field specify https://github.com/dschaffe/brackets-xunit 
+3. Create a unit test in brackets or open a test in the brackets-xunit/samples directory from the extensions directory
 4. Right click on the script file in the sidebar
 5. Select Run Unit Test from the context menu
 6. The results will appear in new window
@@ -57,7 +57,8 @@ To disable the brackets-xunit menu items for a project, create a config.js in th
 Limitations and Future Enhancements
 ============
 
-* Should add more unit test frameworks like nodeunit and others.
+* Want to support mocha testing framework and any others requested.
+* Want to improve generated test code to be jslint compliant.
 * Interested in generating test templates based on parsing an existing api to help generate or start tests.
 
 Change Log

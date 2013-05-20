@@ -22,8 +22,8 @@
  * brackets-jasmine - a brackets plugin to run jasmine unit tests
  */
  
-/*jslint vars: true, plusplus: true, devel: true, nomen: true, indent: 4, maxerr: 50 */
-/*global define, brackets, $, global, jasmine, require, process, __dirname, exports */
+/*jslint vars: true, plusplus: true, devel: true, nomen: true, indent: 4, maxerr: 50, node: true */
+/*global define, brackets, $, global */
 (function () {
     "use strict";
 

@@ -198,6 +198,24 @@ define(function (require, exports, module) {
             });
         });
     }
+    
+    // jasmine-node
+    function runJasmineNode() {
+        var entry = ProjectManager.getSelectedItem();
+        if (entry === undefined) {
+            entry = DocumentManager.getCurrentDocument().file;
+        }
+        var path = entry.fullPath;
+        nodeConnection.domains.jasmine.runTest(path)
+            .fail(function (err) {
+                console.log("[brackets-jasmine] error running file: " + entry.fullPath + " message: " + err.toString());
+                var dlg = Dialogs.showModalDialog(
+                    Dialogs.DIALOG_ID_ERROR,
+                    "Jasmine Error",
+                    "The test file contained an error: " + err.toString()
+                );
+            });
+    }
 
     // Execute QUnit test
     function runQUnit() {
@@ -380,6 +398,7 @@ define(function (require, exports, module) {
             filename = DocumentManager.getCurrentDocument().file.name,
             contents = DocumentManager.getCurrentDocument().getText(),
             userequire = contents.match(/define\w*\(/),
+            isnode = contents.match(/node\w*\:true/),
             i,
             j,
             fparamstr;
@@ -425,8 +444,8 @@ define(function (require, exports, module) {
                     fparamstr += functions[i].params[j];
                 }
                 test += 'describe' + '("test ' + functions[i].name + '(' + fparamstr + ')", function () {\n';
+                test += '    "use strict";\n';
                 if (fparamstr !== '') {
-                    test += '    "use strict";\n';
                     test += '    var ' + fparamstr + ';\n';
                 }
                 test += '    it("' + functions[i].name + '(' + fparamstr + ') === ?", function () {\n' +
@@ -523,24 +542,6 @@ define(function (require, exports, module) {
                 "    Y.Test.Runner" + ".run();\n" +
                 "});\n";
         createNewFile(fullpath, test, ".yui");
-    }
-
-    // jasmine-node
-    function runJasmineNode() {
-        var entry = ProjectManager.getSelectedItem();
-        if (entry === undefined) {
-            entry = DocumentManager.getCurrentDocument().file;
-        }
-        var path = entry.fullPath;
-        nodeConnection.domains.jasmine.runTest(path)
-            .fail(function (err) {
-                console.log("[brackets-jasmine] error running file: " + entry.fullPath + " message: " + err.toString());
-                var dlg = Dialogs.showModalDialog(
-                    Dialogs.DIALOG_ID_ERROR,
-                    "Jasmine Error",
-                    "The test file contained an error: " + err.toString()
-                );
-            });
     }
 
     // converts time in ms to a more readable string format
@@ -761,8 +762,6 @@ define(function (require, exports, module) {
                 return "yui";
             } else if (text.match(/define\(/i) && text.match(/describe\s*\(/)) {
                 return "jasmine";
-            } else if (text.match(/node: true/i) && text.match(/describe\s*\(/)) {
-                return "node";
             } else if (text.match(/brackets-xunit:\s*jasmine-node/i)) {
                 return "node";
             } else if (text.match(/brackets-xunit:\s*jasmine/i) !== null) {

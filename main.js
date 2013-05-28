@@ -845,7 +845,7 @@ define(function (require, exports, module) {
         var selectedEntry = DocumentManager.getCurrentDocument().file,
             text = DocumentManager.getCurrentDocument().getText();
         cleanMenu(workingsetMenu);
-        readConfig.done(function () {
+        readConfig().done(function () {
             checkFileTypes(workingsetMenu, selectedEntry, text);
         });
     });

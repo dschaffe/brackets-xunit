@@ -58,7 +58,8 @@ define(function (require, exports, module) {
         workingsetMenu      = Menus.getContextMenu(Menus.ContextMenuIds.WORKING_SET_MENU),
         nodeConnection      = new NodeConnection(),
         _windows            = {},
-        testFileIndex       = 0;
+        testFileIndex       = 0,
+        enableHtml          = false;
 
     // display a modal dialog when an error occurs
     function showError(title, message) {
@@ -805,7 +806,7 @@ define(function (require, exports, module) {
             menu.addMenuItem(SCRIPT_CMD, "", Menus.LAST);
         } else if (type === "node") {
             menu.addMenuItem(NODETEST_CMD, "", Menus.LAST);
-        } else if (type === "html") {
+        } else if (enableHtml && type === "html") {
             menu.addMenuItem(VIEWHTML_CMD, "", Menus.LAST);
         }
         if (type === "generate") {

@@ -24,7 +24,6 @@
 
 /*jslint vars: true, plusplus: true, devel: true, nomen: true, indent: 4, maxerr: 50 */
 /*global brackets, define, $, window, Mustache, document */
-
 define(function (require, exports, module) {
     'use strict';
 
@@ -41,7 +40,7 @@ define(function (require, exports, module) {
         FileViewController  = brackets.getModule("project/FileViewController");
 
     var moduledir           = FileUtils.getNativeModuleDirectoryPath(module),
-        templateEntry       = new NativeFileSystem.FileEntry(moduledir + '/html/jasmineReportTemplate.html'),
+        templateEntry       = new NativeFileSystem.FileEntry(moduledir + '/templates/jasmineNodeReportTemplate.html'),
         reportJasNodeEntry  = new NativeFileSystem.FileEntry(moduledir + '/node/reports/jasmineReport.html'),
         COMMAND_ID          = "BracketsXUnit.BracketsXUnit",
         commands            = [],
@@ -61,7 +60,10 @@ define(function (require, exports, module) {
         testFileIndex       = 0,
         enableHtml          = false;
 
-    // display a modal dialog when an error occurs
+    /* display a modal dialog
+     * title: string  
+     * message: string
+     */
     function showError(title, message) {
         Dialogs.showModalDialog(
             Dialogs.DIALOG_ID_ERROR,
@@ -70,6 +72,12 @@ define(function (require, exports, module) {
         );
     }
  
+    /* finds the brackets-xunit: includes= strings contained in a test
+     * parameters: contents dir
+     *    contents = string of the entire test
+     *    dir = the base directory
+     * returns: string of <script src="dir+path"/>
+     */
     function parseIncludes(contents, dir) {
         var includes = '';
         if (contents && contents.match(/brackets-xunit:\s*includes=/)) {
@@ -83,7 +91,8 @@ define(function (require, exports, module) {
         }
         return includes;
     }
-   
+
+    // chain: connects multiple function calls together,  the functions must return Deferred objects
     function chain() {
         var functions = Array.prototype.slice.call(arguments, 0);
         if (functions.length > 0) {
@@ -200,7 +209,8 @@ define(function (require, exports, module) {
         });
     }
     
-    // jasmine-node
+    // Run jasmine-node test, call to node server
+    //    when finishes the jasmine.update event is called
     function runJasmineNode() {
         var entry = ProjectManager.getSelectedItem();
         if (entry === undefined) {
@@ -218,7 +228,7 @@ define(function (require, exports, module) {
             });
     }
 
-    // Execute QUnit test
+    // Runs a QUnit test
     function runQUnit() {
         var entry = ProjectManager.getSelectedItem();
         if (entry === undefined) {
@@ -249,6 +259,7 @@ define(function (require, exports, module) {
             });
         });
     }
+    // opens an html file in a new window
     function viewHtml() {
         var entry = ProjectManager.getSelectedItem();
         if (entry === undefined) {
@@ -259,7 +270,9 @@ define(function (require, exports, module) {
         w.focus();
     }
     
-    // Run File as shell script using node process spawn
+    // Run a current file as a shell script using node process spawn
+    // results are returned as the script runs from process.stdout, process.stderr
+    // when the script finishes the exit code is returned from the event process.exit
     function runScript() {
         var entry = ProjectManager.getSelectedItem();
         if (entry === undefined) {
@@ -282,16 +295,20 @@ define(function (require, exports, module) {
             }
         }
         nodeConnection.domains.process.spawnSession({executable: path, args: args, cacheTime: 100}).done(function (status) {
-            var pid = status[0];
-            var template = require("text!templates/process.html");
-            var html = Mustache.render(template, { path: path, title: "script - " + path, args: argsout});
-            var newWindow = window.open("about:blank", null, "width=600,height=200");
+            var template = require("text!templates/process.html"),
+                html = Mustache.render(template, { path: path, title: "script - " + path, args: argsout}),
+                newWindow = window.open("about:blank", null, "width=600,height=200");
             newWindow.document.write(html);
-            newWindow.document.getElementById("exitcode").innerHTML = "running with pid " + pid;
+            newWindow.document.getElementById("exitcode").innerHTML = "running with pid " + status.pid;
             newWindow.focus();
-            _windows[pid] = {window: newWindow, startTime: new Date(), type: "script"};
+            _windows[status.pid] = {window: newWindow, startTime: new Date(), type: "script"};
         });
     }
+
+    // parses the current javascript document
+    // an array containing function name and parameters are returned
+    // returns: array of objects { name, params } 
+    //          params is an array of strings containing parameter names
     function parseCurrentDocument() {
         var text = DocumentManager.getCurrentDocument().getText();
         var filename = DocumentManager.getCurrentDocument().file.name;
@@ -310,6 +327,8 @@ define(function (require, exports, module) {
         });
         return functions;
     }
+    // createNewFile: for generated tests created a new file in brackets
+    // the file is added to the project (left panel)
     function createNewFile(fullpath, contents, testExt) {
         function _getUntitledFileSuggestion(dir, baseFileName, fileExt, isFolder) {
             var result = new $.Deferred();
@@ -372,6 +391,7 @@ define(function (require, exports, module) {
         return deferred;
     }
     
+    // returns a global object per test type to pass jslint
     function generateGlobalDeclaration(type, test, functions) {
         var fnames = '', i;
         switch (type) {
@@ -575,6 +595,7 @@ define(function (require, exports, module) {
         return result;
     }
 
+    // setup, connects to the node server loads node/JasmineDomain and node/ProcessDomain
     AppInit.appReady(function () {
         nodeConnection = new NodeConnection();
         function connect() {
@@ -603,18 +624,17 @@ define(function (require, exports, module) {
                 );
             } else {
                 FileUtils.readAsText(templateEntry).done(function (text, timestamp) {
+
                     jsondata = jsondata.replace(/'/g, "");
-                    var data = JSON.parse(jsondata);
-                    var index = text.indexOf("%jsondata%");
-                    text = text.substring(0, index) + jsondata + text.substring(index + 10);
-                    index = text.indexOf("%time%");
+                    
+                    var jdata = JSON.parse(jsondata);
                     var totaltime = 0;
                     var i;
-                    for (i = 0; i < data.length; i++) {
-                        totaltime = totaltime + parseFloat(data[i].time);
+                    for (i = 0; i < jdata.length; i++) {
+                        totaltime = totaltime + parseFloat(jdata[i].time);
                     }
-                    text = text.substring(0, index) + totaltime + text.substring(index + 6);
-                    FileUtils.writeText(reportJasNodeEntry, text).done(function () {
+                    var html = Mustache.render(text, {jsondata: jsondata, time: totaltime});
+                    FileUtils.writeText(reportJasNodeEntry, html).done(function () {
                         window.open(reportJasNodeEntry.fullPath);
                     });
                 });
@@ -727,7 +747,8 @@ define(function (require, exports, module) {
         });
         chain(connect, loadJasmineDomain, loadProcessDomain);
     });
-    
+
+    // reads config.js to determine if brackets-xunit should be disabled for the current project     
     function readConfig() {
         var result = new $.Deferred();
         var root = ProjectManager.getProjectRoot(),
@@ -784,13 +805,22 @@ define(function (require, exports, module) {
             return "unknown";
         }
     }
+    /*
+     * cleanMenu - removes all brackets-xunit menu items from a menu
+     * parameters: menu - the WorkingSetMenu or the ProjectMenu
+     */
     function cleanMenu(menu) {
         var i;
         for (i = 0; i < commands.length; i++) {
             menu.removeMenuItem(commands[i]);
         }
     }
-    // on click check if file matches a test type and add context menuitem
+    /*
+     * checkFileTypes - adds a menuitem to a menu if the current file matches a known type
+     * parameters: menu - the context menu or working files menu
+     *             entry - the current file entry object containing the file name
+     *             text - the contents of the current file
+     */
     function checkFileTypes(menu, entry, text) {
         if (entry === null) {
             return "unknown";
@@ -817,7 +847,8 @@ define(function (require, exports, module) {
     }
 
     // Register commands as right click menu items
-    commands = [ YUITEST_CMD, JASMINETEST_CMD, QUNITTEST_CMD, SCRIPT_CMD, NODETEST_CMD, GENERATE_JASMINE_CMD, GENERATE_QUNIT_CMD, GENERATE_YUI_CMD, VIEWHTML_CMD];
+    commands = [ YUITEST_CMD, JASMINETEST_CMD, QUNITTEST_CMD, SCRIPT_CMD, NODETEST_CMD, GENERATE_JASMINE_CMD,
+                 GENERATE_QUNIT_CMD, GENERATE_YUI_CMD, VIEWHTML_CMD];
     CommandManager.register("Run YUI Unit Test", YUITEST_CMD, runYUI);
     CommandManager.register("Run Jasmine xUnit Test", JASMINETEST_CMD, runJasmine);
     CommandManager.register("Run QUnit xUnit Test", QUNITTEST_CMD, runQUnit);
@@ -828,7 +859,7 @@ define(function (require, exports, module) {
     CommandManager.register("Generate YUI xUnit Test", GENERATE_YUI_CMD, generateYuiTest);
     CommandManager.register("xUnit View html", VIEWHTML_CMD, viewHtml);
 
-    // Determine type of test for selected item in project
+    // check if the extension should add a menu item to the project menu (under the project name, left panel)
     $(projectMenu).on("beforeContextMenuOpen", function (evt) {
         var selectedEntry = ProjectManager.getSelectedItem(),
             text = '';
@@ -840,7 +871,7 @@ define(function (require, exports, module) {
             checkFileTypes(projectMenu, selectedEntry, text);
         });
     });
-    // Determine type of test for selected item in project
+    // check if the extension should add a menu item to the workingset menu (under Working Files, left panel)
     $(workingsetMenu).on("beforeContextMenuOpen", function (evt) {
         var selectedEntry = DocumentManager.getCurrentDocument().file,
             text = DocumentManager.getCurrentDocument().getText();

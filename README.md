@@ -2,9 +2,9 @@ brackets-xunit
 ===========
 
 A brackets extension to detect and run various test tools against the currently edited brackets program.  The plugin
-currently supports jasmine, YUI3, qunit, and test262 testing frameworks.  The plugin also can run any script if it is executable
-and contains #!/usr/bin/env on the first line.  For example a node, python, or bash script can be executed.  Selecting Run
-Script on the context menu will invoke a new window containing the stdout and stderr of the script output.
+currently supports jasmine, jasmine-node, YUI3, qunit, and test262 testing frameworks.  The plugin also can run any script
+if it is executable and contains #!/usr/bin/env on the first line.  For example a node, python, or bash script can be executed. 
+Selecting Run Script on the context menu will invoke a new window containing the stdout and stderr of the script output.
 
 Installation
 ===========

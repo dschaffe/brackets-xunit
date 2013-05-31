@@ -20,29 +20,57 @@
  * DEALINGS IN THE SOFTWARE.
  * 
  */
-/*jslint vars: true, plusplus: true, devel: true, nomen: true, indent: 4, maxerr: 50 */
+/*jslint indent: 4, maxerr: 50 */
 /*global define, brackets, $, global, require, process, exports */
  
+// The code runs in brackets node server
+// functions:
+//      process.spawnSession() 
+//      process.killSession(pid)
+// events:
+//      stdout returns object{pid,data} 
+//      stderr returns object{pid,data}
+//      exit returns object{pid,exitcode}
+
 (function () {
     "use strict";
     
-    var spawn = require("child_process").spawn;
-    var path = require("path");
-
-    var _sessions = {},
+    var spawn = require("child_process").spawn,
+        path = require("path"),
+        sessions = {},
         domainManager,
-        cacheTimeDefault = 3000;  // minimum time in seconds to send stdout data through the process.stdout event
-
+        cmds,
+        cacheTimeDefault = 3000;  // minimum time in milliseconds to send stdout data through the process.stdout event
+                                  // passing data too frequently to the brackets process overloads the editor
+   /*
+    * spawnSession - runs an executable file using node's child_process.spawn.
+    *
+    * parmeters: object {executable, args, shell, directory, cacheTime, env}
+    *            executable = file to run
+    *            args = array of arguments to execute
+    *            shell = key to return identifying the process
+    *            directory = initial directory (cwd) to execute process
+    *            cacheTime = time in ms for minimum frequency to return stdout data
+    *            env = object environment variables to pass
+    * returns: object{pid,commands,errors}
+    *            pid = os process id
+    *            commands = array of executable and parameters
+    *            errors = any error messages caught during spawn
+    */
     function spawnSession(info) {
         var command = info.executable,
             parameters = info.args,
             shell = info.shells,
+            errors = '',
             session,
-            errorMsg = '';
+            directory,
+            cacheTime,
+            env,
+            i;
         try {
-            var directory = info.directory,
-                cacheTime = info.cacheTime,
-                env = info.env;
+            directory = info.directory;
+            cacheTime = info.cacheTime;
+            env = info.env;
             if (cacheTime === undefined) {
                 cacheTime = cacheTimeDefault;
             }
@@ -56,15 +84,14 @@
                 directory = command.substring(0, command.lastIndexOf('/'));
             }
             directory = directory.replace(/\//g, path.sep);
-            var i;
-            for (i = 0; i < parameters.length; i++) {
+            for (i = 0; i < parameters.length; i += 1) {
                 parameters[i] = parameters[i].replace(/\//g, path.sep);
             }
             session = spawn(command, parameters, { cwd: directory, env: env });
-            _sessions[session.pid] = {session: session, lastSentTime: Number(new Date()), cacheData: '', cacheTime: cacheTime};
+            sessions[session.pid] = {session: session, lastSentTime: Number(new Date()), cacheData: '', cacheTime: cacheTime};
             session.stdout.setEncoding();
             session.stdout.on("data", function (data) {
-                var result = _sessions[session.pid];
+                var result = sessions[session.pid];
                 if (Number(new Date()) - result.lastSentTime > result.cacheTime) {
                     result.lastSentTime = Number(new Date());
                     domainManager.emitEvent("process", "stdout", {pid: session.pid, data: result.cacheData + data});
@@ -80,21 +107,23 @@
             });
     
             session.on("exit", function (code) {
-                var result = _sessions[session.pid];
+                var result = sessions[session.pid];
                 domainManager.emitEvent("process", "exit", { pid : session.pid, exitcode : code, data: result.cacheData});
             });
     
         } catch (e) {
-            errorMsg = e.message;
+            errors = e.message;
         }
-        var cmds = [command];
+        cmds = [command];
         cmds = cmds.concat(parameters);
-        return [session.pid, cmds, shell, errorMsg];
+        return {pid: session.pid, commands: cmds, errors: errors};
     }
     
+    /* kills a process
+     *     pid - the process id
+     */
     function killSession(pid) {
-        var session = _sessions[pid].session;
-    
+        var session = sessions[pid].session;
         if (session) {
             session.kill();
         }
@@ -112,20 +141,8 @@
             "spawnSession",    // command name
             spawnSession,      // command handler function
             false,              // this command is synchronous
-            "Opens a new session",
+            "Spawns a new process",
             [
-                {
-                    name: "initialDirectory",
-                    type: "string",
-                    description: "Initial directory path"
-                }
-            ],
-            [
-                {
-                    name: "session",
-                    type: "number",
-                    description: "session data"
-                }
             ]
         );
 
@@ -136,65 +153,26 @@
             killSession,        // command handler function
             false,              // this command is synchronous
             "Kills a spawned process",
-            [
-                {
-                    name: "pid",
-                    type: "number",
-                    description: "PID of the session to destroy"
-                }
-            ]
+            []
         );
 
         // event: process.stdout
         DomainManager.registerEvent(
             "process",
             "stdout",
-            [
-                {
-                    name: "pid",
-                    type: "number",
-                    description: "Shell PID"
-                },
-                {
-                    name: "message",
-                    type: "string",
-                    description: "stdout message"
-                }
-            ]
+            []
         );
         // event: process.stderr
         DomainManager.registerEvent(
             "process",
             "stderr",
-            [
-                {
-                    name: "pid",
-                    type: "number",
-                    description: "Shell PID"
-                },
-                {
-                    name: "message",
-                    type: "string",
-                    description: "stderr message"
-                }
-            ]
+            []
         );
         // event: process.exit
         DomainManager.registerEvent(
             "process",
             "exit",
-            [
-                {
-                    name: "pid",
-                    type: "number",
-                    description: "Shell PID"
-                },
-                {
-                    name: "result",
-                    type: "object",
-                    description: "exit code"
-                }
-            ]
+            []
         );
     }
     exports.init = init;

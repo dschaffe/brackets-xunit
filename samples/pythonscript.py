@@ -1,5 +1,5 @@
-#!/usr/bin/env python
-# brackets-xunit: args=3
+#!/usr/bin/env python -u
+# brackets-xunit: args=10
 import time,sys
 loops=5
 if len(sys.argv)>1:

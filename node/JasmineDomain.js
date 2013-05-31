@@ -19,20 +19,53 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER 
  * DEALINGS IN THE SOFTWARE.
  * 
- * brackets-jasmine - a brackets plugin to run jasmine unit tests
+ * brackets-xunit - a brackets plugin to run unit tests
  */
  
-/*jslint vars: true, plusplus: true, devel: true, nomen: true, indent: 4, maxerr: 50, node: true */
+/*jslint nomen: true, indent: 4, maxerr: 50, node: true */
 /*global define, brackets, $, global */
+
+// runs Jasmine Node tests
 (function () {
     "use strict";
 
-    var domainManager = null,
-        util,
+    var jasmine = require('./node_modules/jasmine-node/lib/jasmine-node/index'), // load jasmine harness
         Path = require('path'),
-        fs = require('fs');
+        fs = require('fs'),
+        domainManager = null,
+        exitCode = 0,
+        extentions = "js",
+        match = '.',
+        matchall = true,
+        autotest = false,
+        useHelpers = true,
+        captureExceptions = false,
+        results = [],
+        existsSync = fs.existsSync || Path.existsSync,
+        specFolder = null,
+        isVerbose = true,
+        showColors = true,
+        teamcity = process.env.TEAMCITY_PROJECT_NAME || false,
+        useRequireJs = false,
+        regExpSpec = new RegExp(match + (matchall ? "" : "spec\\.") + "(" + extentions + ")$", 'i'),
+        junitreport = {
+            report: true,
+            savePath : __dirname + "/reports/",
+            useDotNotation: true,
+            consolidate: true
+        },
+        options = {
+            specFolder:   specFolder,
+            isVerbose:    isVerbose,
+            showColors:   showColors,
+            teamcity:     teamcity,
+            useRequireJs: useRequireJs,
+            regExpSpec:   regExpSpec,
+            junitreport:  junitreport
+        },
+        key,
+        util;
 
-    var jasmine = require('./node_modules/jasmine-node/lib/jasmine-node/index');
 
     try {
         util = require('util');
@@ -40,66 +73,32 @@
         util = require('sys');
     }
 
-    var specFolder = null;
-
     // The following line keeps the jasmine setTimeout in the proper scope
     jasmine.setTimeout = jasmine.getGlobal().setTimeout;
     jasmine.setInterval = jasmine.getGlobal().setInterval;
-    var key;
     for (key in jasmine) {
         if (jasmine.hasOwnProperty(key) && key !== 'undefined') {
             global[key] = jasmine[key];
         }
     }
-    var exitCode = 0;
-    var isVerbose = true;
-    var showColors = true;
-    var teamcity = process.env.TEAMCITY_PROJECT_NAME || false;
-    var useRequireJs = false;
-    var extentions = "js";
-    var match = '.';
-    var matchall = true;
-    var autotest = false;
-    var useHelpers = true;
-    var captureExceptions = false;
-    var results = [];
-    var junitreport = {
-        report: true,
-        savePath : __dirname + "/reports/",
-        useDotNotation: true,
-        consolidate: true
-    };
-
-    var existsSync = fs.existsSync || Path.existsSync;
-    var regExpSpec = new RegExp(match + (matchall ? "" : "spec\\.") + "(" + extentions + ")$", 'i');
-
-    var options = {
-        specFolder:   specFolder,
-        isVerbose:    isVerbose,
-        showColors:   showColors,
-        teamcity:     teamcity,
-        useRequireJs: useRequireJs,
-        regExpSpec:   regExpSpec,
-        junitreport:  junitreport
-    };
-
-    
 
     function readXmlResults(reportdir, callback) {
-        var files = fs.readdirSync(reportdir);
-        var resultCount = 0;
-        var results = [];
-        var parseString = require('xml2js').parseString;
-        var i;
+        var files = fs.readdirSync(reportdir),
+            resultCount = 0,
+            results = [],
+            parseString = require('xml2js').parseString,
+            file,
+            xml,
+            i;
         function parseStringDone(err, result) {
             results[results.length] = result;
             if (results.length === files.length) {
                 callback(results);
             }
         }
-        for (i = 0; i < files.length; i++) {
-            var file = reportdir + "/" + files[i];
-            var xml = fs.readFileSync(file);
+        for (i = 0; i < files.length; i += 1) {
+            file = reportdir + "/" + files[i];
+            xml = fs.readFileSync(file);
             parseString(xml, parseStringDone);
         }
         if (files.length === 0) {
@@ -109,11 +108,11 @@
 
     options.onComplete = function () {
         readXmlResults(junitreport.savePath, function (resultxml) {
-            var i, j;
+            var i, j, result, testcases, currenttestcase;
             results = [];
-            for (i = 0; i < resultxml.length; i++) {
+            for (i = 0; i < resultxml.length; i += 1) {
                 if (resultxml !== undefined && resultxml[i] !== undefined) {
-                    var result = {};
+                    result = {};
                     result.path = options.specFolder;
                     result.title = result.path;
                     if (result.title[result.title.length - 1] === '/') {
@@ -126,9 +125,9 @@
                     result.time = resultxml[i].testsuites.testsuite[0].$.time;
                     result.timestamp = resultxml[i].testsuites.testsuite[0].$.timestamp;
                     result.testcases = [];
-                    var testcases = resultxml[i].testsuites.testsuite[0].testcase;
-                    for (j = 0; j < testcases.length; j++) {
-                        var currenttestcase = testcases[j];
+                    testcases = resultxml[i].testsuites.testsuite[0].testcase;
+                    for (j = 0; j < testcases.length; j += 1) {
+                        currenttestcase = testcases[j];
                         result.testcases[j] = {};
                         result.testcases[j].name = currenttestcase.$.name;
                         result.testcases[j].time = currenttestcase.$.time;
@@ -144,10 +143,10 @@
     };
 
     function cleanResults(reportdir) {
+        var files, i;
         if (fs.existsSync(reportdir)) {
-            var files = fs.readdirSync(reportdir);
-            var i;
-            for (i = 0; i < files.length; i++) {
+            files = fs.readdirSync(reportdir);
+            for (i = 0; i < files.length; i += 1) {
                 fs.unlinkSync(reportdir + "/" + files[i]);
             }
         } else {

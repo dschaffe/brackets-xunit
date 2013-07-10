@@ -25,7 +25,7 @@
 require.config({
     baseUrl: "../..",
     paths: {
-        "text" : "/Users/dschaffe/workspace/brackets/src/thirdparty/text/text", // set to path of text.js from require.js
+        "text" : "thirdparty/text/text", // set to path of text.js from require.js
     }
 });
 // define mocks for brackets to enable headless testing of extension

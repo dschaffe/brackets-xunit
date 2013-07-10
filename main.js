@@ -80,7 +80,7 @@ define(function (require, exports, module) {
      */
     function parseIncludes(contents, dir, includeCodeCoverage) {
         var includes = '',
-            codeCoverage = includeCodeCoverage ? 'data-cover' : '';
+            codeCoverage = includeCodeCoverage ? ' data-cover' : '';
         if (contents && contents.match(/brackets-xunit:\s*includes=/)) {
             var includestr = contents.match(/brackets-xunit:\s*includes=[A-Za-z0-9,\._\-\/]*/)[0];
             includestr = includestr.substring(includestr.indexOf('=') + 1);

@@ -203,15 +203,15 @@ define(function (require, exports, module) {
             expect(menu5.getMenuItems()).toEqual(['generate_jasmine_cmd', 'generate_qunit_cmd', 'generate_yui_cmd']);
         });
     });
-    describe("test parseIncludes(contents,dir) - parse includes from brackets-xunit: includes and build <script src>", function() {
+    describe("test parseIncludes(contents,dir,cache) - parse includes from brackets-xunit: includes and build <script src>", function() {
         it("parseIncludes('','') == ''", function() {
             expect(testapi.parseIncludes('', '')).toEqual('');
         });
-        it("parseIncludes('one,two*,three','dir') == '<script src='dir/one'><script src='dir/three'><script src='dir/two' data-cover>'", function() {
-            expect(testapi.parseIncludes('header\nbrackets-xunit:  includes=one,two*,three', 'dir/')).toEqual(
-              '<script src="dir/one"></script>\n' +
-              '<script src="dir/two" data-cover></script>\n' +
-              '<script src="dir/three"></script>\n');
+        it("parseIncludes('one,two*,three','dir','cache') == '<script src='dir/one?u=cache'><script src='dir/three?u=cache'><script src='dir/two?u=cache' data-cover>'", function() {
+            expect(testapi.parseIncludes('header\nbrackets-xunit:  includes=one,two*,three', 'dir','cache')).toEqual(
+              '<script src="dir/one?u=cache"></script>\n' +
+              '<script src="dir/two?u=cache" data-cover></script>\n' +
+              '<script src="dir/three?u=cache"></script>\n');
         });
     });
 });

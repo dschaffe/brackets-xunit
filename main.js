@@ -78,7 +78,7 @@ define(function (require, exports, module) {
      *    dir = the base directory
      * returns: string of <script src="dir+path"/>
      */
-    function parseIncludes(contents, dir) {
+    function parseIncludes(contents, dir, cache) {
         var includes = '';
         if (contents && contents.match(/brackets-xunit:\s*includes=/)) {
             var includestr = contents.match(/brackets-xunit:\s*includes=[A-Za-z0-9,\._\-\/\*]*/)[0];
@@ -93,7 +93,7 @@ define(function (require, exports, module) {
                     includeFile = includeFile.substring(0, includeFile.length - 1);
                     codeCoverage = ' data-cover';
                 }
-                includes = includes + '<script src="' + dir + includeFile + '"' + codeCoverage + '></script>\n';
+                includes = includes + '<script src="' + dir + '/' + includeFile + '?u=' + cache + '"' + codeCoverage + '></script>\n';
             }
         }
         return includes;
@@ -249,7 +249,7 @@ define(function (require, exports, module) {
             testBase = testName.substring(0, testName.lastIndexOf('.')),
             qunitReportEntry    = new NativeFileSystem.FileEntry(dir + testBase + '/qUnitReport.html'),
             useCodeCoverage = true,
-            includes = parseIncludes(contents, dir, useCodeCoverage);
+            includes = parseIncludes(contents, dir, new Date().getTime());
         var data = { filename : entry.name,
                      title : 'QUnit test - ' + entry.name,
                      includes : includes,

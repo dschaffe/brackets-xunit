@@ -79,15 +79,21 @@ define(function (require, exports, module) {
      * returns: string of <script src="dir+path"/>
      */
     function parseIncludes(contents, dir, includeCodeCoverage) {
-        var includes = '',
-            codeCoverage = includeCodeCoverage ? ' data-cover' : '';
+        var includes = '';
         if (contents && contents.match(/brackets-xunit:\s*includes=/)) {
-            var includestr = contents.match(/brackets-xunit:\s*includes=[A-Za-z0-9,\._\-\/]*/)[0];
+            var includestr = contents.match(/brackets-xunit:\s*includes=[A-Za-z0-9,\._\-\/\*]*/)[0];
             includestr = includestr.substring(includestr.indexOf('=') + 1);
+            
             var includedata = includestr.split(',');
             var i;
             for (i = 0; i < includedata.length; i++) {
-                includes = includes + '<script src="' + dir + includedata[i] + '"' + codeCoverage + '></script>\n';
+                var includeFile = includedata[i],
+                    codeCoverage = '';
+                if (includeFile[includeFile.length - 1] === "*") {
+                    includeFile = includeFile.substring(0, includeFile.length - 1);
+                    codeCoverage = ' data-cover';
+                }
+                includes = includes + '<script src="' + dir + includeFile + '"' + codeCoverage + '></script>\n';
             }
         }
         return includes;

@@ -207,10 +207,10 @@ define(function (require, exports, module) {
         it("parseIncludes('','') == ''", function() {
             expect(testapi.parseIncludes('', '')).toEqual('');
         });
-        it("parseIncludes('one,two,three','dir') == '<script src='dir/one'><script src='dir/three'><script src='dir/two'>'", function() {
-            expect(testapi.parseIncludes('header\nbrackets-xunit:  includes=one,two,three', 'dir/')).toEqual(
+        it("parseIncludes('one,two*,three','dir') == '<script src='dir/one'><script src='dir/three'><script src='dir/two' data-cover>'", function() {
+            expect(testapi.parseIncludes('header\nbrackets-xunit:  includes=one,two*,three', 'dir/')).toEqual(
               '<script src="dir/one"></script>\n' +
-              '<script src="dir/two"></script>\n' +
+              '<script src="dir/two" data-cover></script>\n' +
               '<script src="dir/three"></script>\n');
         });
     });

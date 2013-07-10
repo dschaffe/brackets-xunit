@@ -78,15 +78,16 @@ define(function (require, exports, module) {
      *    dir = the base directory
      * returns: string of <script src="dir+path"/>
      */
-    function parseIncludes(contents, dir) {
-        var includes = '';
+    function parseIncludes(contents, dir, includeCodeCoverage) {
+        var includes = '',
+            codeCoverage = includeCodeCoverage ? 'data-cover' : '';
         if (contents && contents.match(/brackets-xunit:\s*includes=/)) {
             var includestr = contents.match(/brackets-xunit:\s*includes=[A-Za-z0-9,\._\-\/]*/)[0];
             includestr = includestr.substring(includestr.indexOf('=') + 1);
             var includedata = includestr.split(',');
             var i;
             for (i = 0; i < includedata.length; i++) {
-                includes = includes + '<script src="' + dir + includedata[i] + '"></script>\n';
+                includes = includes + '<script src="' + dir + includedata[i] + '"' + codeCoverage + '></script>\n';
             }
         }
         return includes;
@@ -241,12 +242,14 @@ define(function (require, exports, module) {
             testName = entry.fullPath.substring(entry.fullPath.lastIndexOf("/") + 1),
             testBase = testName.substring(0, testName.lastIndexOf('.')),
             qunitReportEntry    = new NativeFileSystem.FileEntry(dir + testBase + '/qUnitReport.html'),
-            includes = parseIncludes(contents, dir);
+            useCodeCoverage = true,
+            includes = parseIncludes(contents, dir, useCodeCoverage);
         var data = { filename : entry.name,
                      title : 'QUnit test - ' + entry.name,
                      includes : includes,
                      templatedir : moduledir,
-                     contents : contents
+                     contents : contents,
+                     coverage: "<script src='https://raw.github.com/alex-seville/blanket/master/dist/qunit/blanket.min.js'></script>"
                    };
         var template = require("text!templates/qunit.html");
         var html = Mustache.render(template, data);

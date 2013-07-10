@@ -88,12 +88,14 @@ define(function (require, exports, module) {
             var i;
             for (i = 0; i < includedata.length; i++) {
                 var includeFile = includedata[i],
-                    codeCoverage = '';
+                    codeCoverage = '',
+                    cacheBuster = cache ? '?u=' + cache : '';
                 if (includeFile[includeFile.length - 1] === "*") {
                     includeFile = includeFile.substring(0, includeFile.length - 1);
                     codeCoverage = ' data-cover';
+                    cacheBuster = '';
                 }
-                includes = includes + '<script src="' + dir + includeFile + '?u=' + cache + '"' + codeCoverage + '></script>\n';
+                includes = includes + '<script src="' + dir + includeFile + cacheBuster + '"' + codeCoverage + '></script>\n';
             }
         }
         return includes;

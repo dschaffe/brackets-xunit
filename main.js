@@ -93,7 +93,7 @@ define(function (require, exports, module) {
                     includeFile = includeFile.substring(0, includeFile.length - 1);
                     codeCoverage = ' data-cover';
                 }
-                includes = includes + '<script src="' + dir + '/' + includeFile + '?u=' + cache + '"' + codeCoverage + '></script>\n';
+                includes = includes + '<script src="' + dir + includeFile + '?u=' + cache + '"' + codeCoverage + '></script>\n';
             }
         }
         return includes;

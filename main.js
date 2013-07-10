@@ -78,7 +78,7 @@ define(function (require, exports, module) {
      *    dir = the base directory
      * returns: string of <script src="dir+path"/>
      */
-    function parseIncludes(contents, dir, includeCodeCoverage) {
+    function parseIncludes(contents, dir) {
         var includes = '';
         if (contents && contents.match(/brackets-xunit:\s*includes=/)) {
             var includestr = contents.match(/brackets-xunit:\s*includes=[A-Za-z0-9,\._\-\/\*]*/)[0];

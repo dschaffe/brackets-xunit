@@ -257,7 +257,7 @@ define(function (require, exports, module) {
                      includes : includes,
                      templatedir : moduledir,
                      contents : contents,
-                     coverage: "<script src='https://raw.github.com/alex-seville/blanket/master/dist/qunit/blanket.min.js'></script>"
+                     coverage: "<script src='http://cdnjs.cloudflare.com/ajax/libs/blanket.js/1.1.4/blanket.min.js'></script>"
                    };
         var template = require("text!templates/qunit.html");
         var html = Mustache.render(template, data);

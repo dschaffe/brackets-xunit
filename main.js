@@ -263,11 +263,7 @@ define(function (require, exports, module) {
                      includes : includes,
                      templatedir : moduledir,
                      contents : contents,
-<<<<<<< HEAD
-                     coverage: useCodeCoverage ? "<script src='qunit.blanket.js'></script>" : ""
-=======
-                     coverage: "<script src='http://cdnjs.cloudflare.com/ajax/libs/blanket.js/1.1.4/blanket.min.js'></script>"
->>>>>>> 8953ef411c9bee703a505d63ba05a5104d0f4550
+                     coverage: (useCodeCoverage ? "<script src='qunit.blanket.js'></script>" : "")
                    };
         var template = require("text!templates/qunit.html");
         var html = Mustache.render(template, data),

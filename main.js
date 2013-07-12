@@ -93,7 +93,7 @@ define(function (require, exports, module) {
                 if (includeFile[includeFile.length - 1] === "*") {
                     includeFile = includeFile.substring(0, includeFile.length - 1);
                     codeCoverage = ' data-cover';
-                    cacheBuster = '';
+                    //cacheBuster = '';
                 }
                 includes = includes + '<script src="' + dir + includeFile + cacheBuster + '"' + codeCoverage + '></script>\n';
             }

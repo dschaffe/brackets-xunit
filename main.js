@@ -166,18 +166,22 @@ define(function (require, exports, module) {
             jasmineJsEntry = new NativeFileSystem.FileEntry(dir + testBase + "/jasmine.js"),
             jasmineJsHtml = require("text!templates/jasmine-html.js"),
             jasmineJsHtmlEntry = new NativeFileSystem.FileEntry(dir + testBase + "/jasmine-html.js"),
+            jasmineJsBlanket = require("text!templates/jasmine.blanket.js"),
+            jasmineJsBlanketEntry = new NativeFileSystem.FileEntry(dir + testBase + "/jasmine.blanket.js"),
             requireSrc = require("text!node/node_modules/jasmine-node/node_modules/requirejs/require.js"),
             requireSrcEntry = new NativeFileSystem.FileEntry(dir + testBase + "/require.js");
         var apiFile = contents.match(/require\('\.\/[A-Za-z0-9\-]+\.js/);
         
         
         dirEntry.getDirectory(testBase, {create: true}, function () {
-            var data = {
+            var useCodeCoverage = true,
+                data = {
                     filename : entry.name,
                     jasmineTest : newTestName,
                     title : 'Jasmine test - ' + entry.name,
                     includes : includes,
-                    contents : DocumentManager.getCurrentDocument().getText()
+                    contents : DocumentManager.getCurrentDocument().getText(),
+                    coverage : useCodeCoverage ? "<script src='jasmine.blanket.js'></script>" : ""
                 },
                 template,
                 html;
@@ -194,21 +198,23 @@ define(function (require, exports, module) {
                     FileUtils.writeText(jasmineCssEntry, jasmineCss).done(function () {
                         FileUtils.writeText(jasmineJsEntry, jasmineJs).done(function () {
                             FileUtils.writeText(requireSrcEntry, requireSrc).done(function () {
-                                FileUtils.writeText(jasmineJsHtmlEntry, jasmineJsHtml).done(function () {
-                                    if (apiFile) {
-                                        var apiFileName = apiFile[0].substring(11),
-                                            apiFileEntry = new NativeFileSystem.FileEntry(dir + apiFileName),
-                                            apiNewFileEntry = new NativeFileSystem.FileEntry(dir + testBase + '/' + apiFileName);
-                                        FileUtils.readAsText(apiFileEntry).done(function (text, modtime) {
-                                            FileUtils.writeText(apiNewFileEntry, text).done(function () {
-                                                var reportWin = window.open(jasmineHtmlEntry.fullPath);
-                                                reportWin.focus();
+                                FileUtils.writeText(jasmineJsBlanketEntry, jasmineJsBlanket).done(function () {
+                                    FileUtils.writeText(jasmineJsHtmlEntry, jasmineJsHtml).done(function () {
+                                        if (apiFile) {
+                                            var apiFileName = apiFile[0].substring(11),
+                                                apiFileEntry = new NativeFileSystem.FileEntry(dir + apiFileName),
+                                                apiNewFileEntry = new NativeFileSystem.FileEntry(dir + testBase + '/' + apiFileName);
+                                            FileUtils.readAsText(apiFileEntry).done(function (text, modtime) {
+                                                FileUtils.writeText(apiNewFileEntry, text).done(function () {
+                                                    var reportWin = window.open(jasmineHtmlEntry.fullPath);
+                                                    reportWin.focus();
+                                                });
                                             });
-                                        });
-                                    } else {
-                                        var reportWin = window.open(jasmineHtmlEntry.fullPath);
-                                        reportWin.focus();
-                                    }
+                                        } else {
+                                            var reportWin = window.open(jasmineHtmlEntry.fullPath);
+                                            reportWin.focus();
+                                        }
+                                    });
                                 });
                             });
                         });
@@ -249,7 +255,7 @@ define(function (require, exports, module) {
             contents = DocumentManager.getCurrentDocument().getText(),
             testName = entry.fullPath.substring(entry.fullPath.lastIndexOf("/") + 1),
             testBase = testName.substring(0, testName.lastIndexOf('.')),
-            qunitReportEntry    = new NativeFileSystem.FileEntry(dir + testBase + '/qUnitReport.html'),
+            qunitReportEntry = new NativeFileSystem.FileEntry(dir + testBase + '/qUnitReport.html'),
             useCodeCoverage = true,
             includes = parseIncludes(contents, dir, new Date().getTime());
         var data = { filename : entry.name,
@@ -257,16 +263,24 @@ define(function (require, exports, module) {
                      includes : includes,
                      templatedir : moduledir,
                      contents : contents,
-                     coverage: "<script src='https://raw.github.com/alex-seville/blanket/master/dist/qunit/blanket.min.js'></script>"
+<<<<<<< HEAD
+                     coverage: useCodeCoverage ? "<script src='qunit.blanket.js'></script>" : ""
+=======
+                     coverage: "<script src='http://cdnjs.cloudflare.com/ajax/libs/blanket.js/1.1.4/blanket.min.js'></script>"
+>>>>>>> 8953ef411c9bee703a505d63ba05a5104d0f4550
                    };
         var template = require("text!templates/qunit.html");
-        var html = Mustache.render(template, data);
+        var html = Mustache.render(template, data),
         // write generated test report to file on disk
+            qunitJsBlanket = require("text!templates/qunit.blanket.js"),
+            qunitJsBlanketEntry = new NativeFileSystem.FileEntry(dir + testBase + "/qunit.blanket.js");
         dirEntry.getDirectory(dir + testBase, {create: true}, function () {
-            FileUtils.writeText(qunitReportEntry, html).done(function () {
-                // launch new window with generated report
-                var report = window.open(qunitReportEntry.fullPath);
-                report.focus();
+            FileUtils.writeText(qunitJsBlanketEntry, qunitJsBlanket).done(function () {
+                FileUtils.writeText(qunitReportEntry, html).done(function () {
+                    // launch new window with generated report
+                    var report = window.open(qunitReportEntry.fullPath + (useCodeCoverage ? "?coverage=true" : ""));
+                    report.focus();
+                });
             });
         });
     }

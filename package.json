@@ -1,0 +1,35 @@
+{
+    "name": "brackets-xunit",
+    "title": "xUnit & Blanket",
+    "version": "0.1.0",
+    "description": "Right mouse run test with code coverage",
+    "homepage": "https://github.com/digiguru/brackets-xunit",
+    "author": "Dan Schaffer (https://github.com/dschaffe) with small modifications by digiguru",
+    "categories":"testing",
+    "keywords": [
+        "test",
+        "testing",
+        "coverage",
+        "blanketjs",
+        "qunit",
+        "jasmine",
+        "yui"
+    ],
+    "files": [
+        "main.js",
+        "package.json",
+        "templates/jasmine-html.js",
+        "templates/jasmine.blanket.js",
+        "templates/jasmine.css",
+        "templates/jasmine.js",
+        "templates/jasmine_requirejs.html",
+        "templates/jasmineNodeReportTemplates.html",
+        "templates/process.html",
+        "templates/qunit.blanket.js",
+        "templates/qunit.html",
+        "templates/yui.html"
+    ],
+    "engines": {
+        "brackets": ">=0.22.0"
+    }
+}

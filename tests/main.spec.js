@@ -22,6 +22,7 @@
  * jasmine unit tests for xunit extension
  */
 
+
 require.config({
     baseUrl: "../..",
     paths: {
@@ -41,6 +42,7 @@ brackets = {
                     };
                 }
             } };
+            
         } else if (name === "file/FileUtils") {
             return { 
                 getNativeModuleDirectoryPath : function(module) {
@@ -210,9 +212,10 @@ define(function (require, exports, module) {
         it("parseIncludes('one,two*,three','dir/','cache') == '<script src='dir/one?u=cache'><script src='dir/three?u=cache'><script src='dir/two?u=cache' data-cover>'", function() {
             expect(testapi.parseIncludes('header\nbrackets-xunit:  includes=one,two*,three', 'dir/','cache')).toEqual(
               '<script src="dir/one?u=cache"></script>\n' +
-              '<script src="dir/two" data-cover></script>\n' +
+              '<script src="dir/two?u=cache" data-cover></script>\n' +
               '<script src="dir/three?u=cache"></script>\n');
         });
+        
         it("parseIncludes('one,two*,three','dir/') == '<script src='dir/one'><script src='dir/three'><script src='dir/two' data-cover>'", function() {
             expect(testapi.parseIncludes('header\nbrackets-xunit:  includes=one,two*,three', 'dir/')).toEqual(
               '<script src="dir/one"></script>\n' +

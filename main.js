@@ -210,38 +210,34 @@ define(function (require, exports, module) {
                 template = require("text!templates/jasmine.html");
                 html = Mustache.render(template, data);
             }
-            FileUtils.writeText(jasmineTestEntry, contents).done(function () {
-                FileUtils.writeText(jasmineHtmlEntry, html).done(function () {
-                    FileUtils.writeText(jasmineCssEntry, jasmineCss).done(function () {
-                        FileUtils.writeText(jasmineJsEntry, jasmineJs).done(function () {
-                              FileUtils.writeText(jasmineJsReporterEntry, jasmineJsReporter).done(function () {
-                                FileUtils.writeText(requireSrcEntry, requireSrc).done(function () {
-                                    FileUtils.writeText(jasmineJsBlanketEntry, jasmineJsBlanket).done(function () {
-                                        FileUtils.writeText(jasmineJsHtmlEntry, jasmineJsHtml).done(function () {
-                                            if (apiFile) {
-                                                var apiFileName = apiFile[0].substring(11),
-                                                    apiFileEntry = new NativeFileSystem.FileEntry(dir + apiFileName),
-                                                    apiNewFileEntry = new NativeFileSystem.FileEntry(dir + testBase + '/' + apiFileName);
-                                                FileUtils.readAsText(apiFileEntry).done(function (text, modtime) {
-                                                    FileUtils.writeText(apiNewFileEntry, text).done(function () {
-                                                        var urlToReport = jasmineHtmlEntry.fullPath + (useCodeCoverage ? "?coverage=true" : "");
-                                                        MyStatusBar.setReportWindow(urlToReport);
-                                                        
-                                                       
-                                                    });
-                                                });
-                                            } else {
-                                                var urlToReport = jasmineHtmlEntry.fullPath + (useCodeCoverage ? "?coverage=true" : "");
-                                                MyStatusBar.setReportWindow(urlToReport);
-                                               
-                                            }
-                                        });
-                                    });
-                                });
-                            });
+            
+             $.when(
+                 FileUtils.writeText(jasmineTestEntry, contents),
+                 FileUtils.writeText(jasmineHtmlEntry, html),
+                 FileUtils.writeText(jasmineCssEntry, jasmineCss),
+                 FileUtils.writeText(jasmineJsEntry, jasmineJs),
+                 FileUtils.writeText(jasmineJsReporterEntry, jasmineJsReporter),
+                 FileUtils.writeText(requireSrcEntry, requireSrc),
+                 FileUtils.writeText(jasmineJsBlanketEntry, jasmineJsBlanket),
+                 FileUtils.writeText(jasmineJsHtmlEntry, jasmineJsHtml)
+             ).done(function(){
+                if (apiFile) {
+                    var apiFileName = apiFile[0].substring(11),
+                        apiFileEntry = new NativeFileSystem.FileEntry(dir + apiFileName),
+                        apiNewFileEntry = new NativeFileSystem.FileEntry(dir + testBase + '/' + apiFileName);
+                    FileUtils.readAsText(apiFileEntry).done(function (text, modtime) {
+                        FileUtils.writeText(apiNewFileEntry, text).done(function () {
+                            var urlToReport = jasmineHtmlEntry.fullPath + (useCodeCoverage ? "?coverage=true" : "");
+                            MyStatusBar.setReportWindow(urlToReport);
+                            
+                           
                         });
                     });
-                });
+                } else {
+                    var urlToReport = jasmineHtmlEntry.fullPath + (useCodeCoverage ? "?coverage=true" : "");
+                    MyStatusBar.setReportWindow(urlToReport);
+                   
+                }
             });
         });
     }
@@ -295,19 +291,15 @@ define(function (require, exports, module) {
             qunitJsBlanket = require("text!templates/qunit.blanket.js"),
             qunitJsBlanketEntry = new NativeFileSystem.FileEntry(dir + testBase + "/qunit.blanket.js");
         dirEntry.getDirectory(dir + testBase, {create: true}, function () {
-            FileUtils.writeText(qunitJsEntry, qunitJs).done(function () {
-                FileUtils.writeText(qunitJsBlanketEntry, qunitJsBlanket).done(function () {
-                    FileUtils.writeText(qunitReportEntry, html).done(function () {
-                        // launch new window with generated report
-                        var urlToReport = qunitReportEntry.fullPath + (useCodeCoverage ? "?coverage=true" : ""),
-                            inter;
-                        
-                        MyStatusBar.setReportWindow(urlToReport);
-                        
-                        
-                    });
-                });
+            $.when(
+                FileUtils.writeText(qunitJsEntry, qunitJs),
+                FileUtils.writeText(qunitJsBlanketEntry, qunitJsBlanket),
+                FileUtils.writeText(qunitReportEntry, html)
+            ).done(function(){
+                var urlToReport = qunitReportEntry.fullPath + (useCodeCoverage ? "?coverage=true" : "");            
+                MyStatusBar.setReportWindow(urlToReport);
             });
+            
         });
     }
     // opens an html file in a new window

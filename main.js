@@ -41,9 +41,10 @@ define(function (require, exports, module) {
         EditorManager       = brackets.getModule("editor/EditorManager"),
         ProjectManager      = brackets.getModule("project/ProjectManager"),
         FileViewController  = brackets.getModule("project/FileViewController"),
-        PanelManager        = brackets.getModule("view/PanelManager"),
-        Resizer             = brackets.getModule("utils/Resizer"),
-        StatusBar           = brackets.getModule("widgets/StatusBar");
+        //PanelManager        = brackets.getModule("view/PanelManager"),
+        //Resizer             = brackets.getModule("utils/Resizer"),
+        //StatusBar           = brackets.getModule("widgets/StatusBar"),
+        MyStatusBar         = require("MyStatusBar");
 
     var moduledir           = FileUtils.getNativeModuleDirectoryPath(module),
         templateEntry       = new NativeFileSystem.FileEntry(moduledir + '/templates/jasmineNodeReportTemplate.html'),
@@ -65,110 +66,12 @@ define(function (require, exports, module) {
         _windows            = {},
         testFileIndex       = 0,
         enableHtml          = false,
-        $xunitResults       = {},
         _collapsed          = false,
         jsXunitTemplate     = require("text!templates/panel.html?u=1"),
         $selectedRow,
         _xunit_panel_visible;
         
-    
-        
-
-    function toggleCollapsed(collapsed) {
-        if (collapsed === undefined) {
-            collapsed = !_collapsed;
-        }
-        
-        _collapsed = collapsed;
-        if (_collapsed) {
-            Resizer.hide($xunitResults);
-        } else {
-            //if (JSLINT.errors && JSLINT.errors.length) {
-            Resizer.show($xunitResults);
-            //}
-        }
-    }
-    
-    function statusPassed(message) {
-        StatusBar.updateIndicator("XUNIT", true, "xunit-failed", 'Failed');
-        $("#XUNIT").text(message);
-    }
-    function statusFailed(message) {
-        StatusBar.updateIndicator("XUNIT", true, "xunit-complete", 'Complete');
-        $("#XUNIT").text(message);
-    }
-    function statusRunning(message) {
-        message = message || "running";
-        StatusBar.updateIndicator("XUNIT", true, "xunit-process", 'Running');
-        $("#XUNIT").text(message);
-    }
-    function statusCoverage(message) {
-        StatusBar.updateIndicator("XUNITCOVERAGE", true, "xunit-complete", 'Complete');
-        $("#XUNITCOVERAGE").text(message);
-    }
-    
-    
-    function initializePanel() {
-        console.log("renderPanel");
-        var xunitHtml = Mustache.render(jsXunitTemplate, {});
-        var xunitPanel = PanelManager.createBottomPanel("xunit.results", $(xunitHtml), 100);
-        $xunitResults = $("#xunit-results");
-        
-        var xunitStatusHtml = $("<div id=\"xunit-status\" title=\"No xunit errors\">No tests</div>", {}),
-            xunitCoverageHtml = $("<div id=\"xunit-coverage\" title=\"No coverage\">No coverage</div>", {});
-        $(xunitStatusHtml).insertBefore("#jslint-status");
-        $(xunitCoverageHtml).insertBefore("#jslint-status");
-        StatusBar.addIndicator("XUNIT", $("#xunit-status"));
-        StatusBar.addIndicator("XUNITCOVERAGE", $("#xunit-coverage"));
-        StatusBar.updateIndicator("XUNIT", true, "xunit-disabled", 'Xunit');
-        StatusBar.updateIndicator("XUNITCOVERAGE", true, "xunit-disabled", 'Xunit');
-
-        //panel.show();
-        
-        $("#xunit-results .close").click(function () {
-            toggleCollapsed(true);
-        });
-
-        $("#XUNIT, #XUNITCOVERAGE").click(function () {
-            /*if (!$(this).hasClass('xunit-disabled')) {
-                if (_xunit_panel_visible) {
-                    //Resizer.hide($karmaResults);
-                    _xunit_panel_visible = false;
-                    //} else {
-                    //showPanel();
-                    
-                }
-            }*/
-            toggleCollapsed();
-        });
-        toggleCollapsed(true);
-    }
-    function renderPanel() {
-        
-        $xunitResults
-                .find(".table-container")
-                .empty()
-                .append($("<h1>HI</h1>"))
-                .scrollTop(0)  // otherwise scroll pos from previous contents is remembered
-                .on("click",
-                    function (e) {
-                    if ($selectedRow) {
-                        $selectedRow.removeClass("selected");
-                    }
-    
-                    $selectedRow  = $(e.target).closest("tr");
-                    $selectedRow.addClass("selected");
-                    var lineTd    = $selectedRow.find("td.line");
-                    var line      = lineTd.text();
-                    var character = lineTd.data("character");
-    
-                    var editor = EditorManager.getCurrentFullEditor();
-                    editor.setCursorPos(line - 1, character - 1, true);
-                    EditorManager.focusEditor();
-                });
-
-       
-    }
+   
     
     /* display a modal dialog
      * title: string  
@@ -253,9 +156,8 @@ define(function (require, exports, module) {
     }
  
     // Execute Jasmine test
-    function runJasmine(callback) {
+    function runJasmine() {
         console.log("runJasmine");
-        renderPanel();
         var entry = ProjectManager.getSelectedItem();
         if (entry === undefined) {
             entry = DocumentManager.getCurrentDocument().file;
@@ -276,6 +178,8 @@ define(function (require, exports, module) {
             jasmineCssEntry = new NativeFileSystem.FileEntry(dir + testBase + "/jasmine.css"),
             jasmineJs = require("text!templates/jasmine.js"),
             jasmineJsEntry = new NativeFileSystem.FileEntry(dir + testBase + "/jasmine.js"),
+            jasmineJsReporter = require("text!templates/jasmineCompleteReporter.js"),
+            jasmineJsReporterEntry = new NativeFileSystem.FileEntry(dir + testBase + "/jasmineCompleteReporter.js"),
             jasmineJsHtml = require("text!templates/jasmine-html.js"),
             jasmineJsHtmlEntry = new NativeFileSystem.FileEntry(dir + testBase + "/jasmine-html.js"),
             jasmineJsBlanket = require("text!templates/jasmine.blanket.js"),
@@ -283,6 +187,7 @@ define(function (require, exports, module) {
             requireSrc = require("text!node/node_modules/jasmine-node/node_modules/requirejs/require.js"),
             requireSrcEntry = new NativeFileSystem.FileEntry(dir + testBase + "/require.js");
         var apiFile = contents.match(/require\('\.\/[A-Za-z0-9\-]+\.js/);
+        
         
         
         dirEntry.getDirectory(testBase, {create: true}, function () {
@@ -309,34 +214,28 @@ define(function (require, exports, module) {
                 FileUtils.writeText(jasmineHtmlEntry, html).done(function () {
                     FileUtils.writeText(jasmineCssEntry, jasmineCss).done(function () {
                         FileUtils.writeText(jasmineJsEntry, jasmineJs).done(function () {
-                            FileUtils.writeText(requireSrcEntry, requireSrc).done(function () {
-                                FileUtils.writeText(jasmineJsBlanketEntry, jasmineJsBlanket).done(function () {
-                                    FileUtils.writeText(jasmineJsHtmlEntry, jasmineJsHtml).done(function () {
-                                        if (apiFile) {
-                                            var apiFileName = apiFile[0].substring(11),
-                                                apiFileEntry = new NativeFileSystem.FileEntry(dir + apiFileName),
-                                                apiNewFileEntry = new NativeFileSystem.FileEntry(dir + testBase + '/' + apiFileName);
-                                            FileUtils.readAsText(apiFileEntry).done(function (text, modtime) {
-                                                FileUtils.writeText(apiNewFileEntry, text).done(function () {
-                                                    var reportWin = window.open(jasmineHtmlEntry.fullPath);
-                                                    if (callback) {
-                                                        reportWin.onload = function () {
-                                                            callback(reportWin);
-                                                        };
-                                                    }
-                                                    reportWin.focus();
-                                                    
+                              FileUtils.writeText(jasmineJsReporterEntry, jasmineJsReporter).done(function () {
+                                FileUtils.writeText(requireSrcEntry, requireSrc).done(function () {
+                                    FileUtils.writeText(jasmineJsBlanketEntry, jasmineJsBlanket).done(function () {
+                                        FileUtils.writeText(jasmineJsHtmlEntry, jasmineJsHtml).done(function () {
+                                            if (apiFile) {
+                                                var apiFileName = apiFile[0].substring(11),
+                                                    apiFileEntry = new NativeFileSystem.FileEntry(dir + apiFileName),
+                                                    apiNewFileEntry = new NativeFileSystem.FileEntry(dir + testBase + '/' + apiFileName);
+                                                FileUtils.readAsText(apiFileEntry).done(function (text, modtime) {
+                                                    FileUtils.writeText(apiNewFileEntry, text).done(function () {
+                                                        var urlToReport = jasmineHtmlEntry.fullPath + (useCodeCoverage ? "?coverage=true" : "");
+                                                        MyStatusBar.setReportWindow(urlToReport);
+                                                        
+                                                       
+                                                    });
                                                 });
-                                            });
-                                        } else {
-                                            var reportWin = window.open(jasmineHtmlEntry.fullPath);
-                                            if (callback) {
-                                                reportWin.onload = function () {
-                                                    callback(reportWin);
-                                                };
+                                            } else {
+                                                var urlToReport = jasmineHtmlEntry.fullPath + (useCodeCoverage ? "?coverage=true" : "");
+                                                MyStatusBar.setReportWindow(urlToReport);
+                                               
                                             }
-                                            reportWin.focus();
-                                        }
+                                        });
                                     });
                                 });
                             });
@@ -401,24 +300,10 @@ define(function (require, exports, module) {
                     FileUtils.writeText(qunitReportEntry, html).done(function () {
                         // launch new window with generated report
                         var urlToReport = qunitReportEntry.fullPath + (useCodeCoverage ? "?coverage=true" : ""),
-                            $frame = $xunitResults.find("#winReport"),
                             inter;
-                        window.reportComplete = function(result) {
-                            if(result.status === "failed") {
-                                statusFailed(result.message);
-                                toggleCollapsed(false);
-                            } else {
-                                statusPassed(result.message);   
-                            }
-                        };
-                        window.reportUpdate = function(result) {
-                            console.log("update", result);
-                            statusRunning(result.message);
-                        };
-                        window.coverageComplete = function(result) {
-                            statusCoverage(result.message);   
-                        };
-                        $frame.attr("src", urlToReport);
+                        
+                        MyStatusBar.setReportWindow(urlToReport);
+                        
                         
                     });
                 });
@@ -774,7 +659,7 @@ define(function (require, exports, module) {
      * it can be passed in as a string (e.g.: "1 == 1" or "$('#bar').is(':visible')" or
      * as a callback function.
      * @param timeOutMillis the max amount of time to wait. If not specified, 3 sec is used.
-     */
+     
     function waitFor(testFx, onReady, timeOutMillis) {
         var maxtimeOutMillis = timeOutMillis || 30001, //< Default Max Timout is 3s
             start = new Date().getTime(),
@@ -796,7 +681,7 @@ define(function (require, exports, module) {
                     }
                 }
             }, 100); //< repeat check every 250ms
-    }
+    }*/
     
     // reads config.js to determine if brackets-xunit should be disabled for the current project     
     function readConfig() {
@@ -897,6 +782,27 @@ define(function (require, exports, module) {
     }
     // setup, connects to the node server loads node/JasmineDomain and node/ProcessDomain
     AppInit.appReady(function () {
+        
+         /*Globals for passing objects from run windows*/
+        window.reportComplete = function (result) {
+            if (result.status === "failed") {
+                MyStatusBar.statusFailed(result.message);
+                MyStatusBar.toggleCollapsed(false);
+            } else {
+                MyStatusBar.statusPassed(result.message);
+            }
+        };
+        
+        window.reportUpdate = function (result) {
+            console.log("update", result);
+            MyStatusBar.statusRunning(result.message);
+        };
+        
+        window.coverageComplete = function (result) {
+            MyStatusBar.statusCoverage(result.message);
+        };
+        
+        
         $(DocumentManager)
             .on("documentSaved.xunit", function (event, document) {
                 
@@ -915,21 +821,7 @@ define(function (require, exports, module) {
                             runYUI();
                         } else if (type === "jasmine") {
                             $("#status-language").text("Javascript+Jasmine");
-                            runJasmine(function (win) {
-                                statusRunning();
-                                waitFor(function () {
-                                    return win.document.body.querySelector('.bar');
-                                }, function () {
-                                    var status = win.document.body.querySelector('.bar').innerText;
-                                    if (win.document.body.querySelector('.passingAlert')) {
-                                        statusPassed(status);
-                                    } else {
-                                        statusFailed(status);
-                                    }
-                                    console.log(status);
-                                    win.close();
-                                });
-                            });
+                            runJasmine();
                         } else if (type === "qunit") {
                             $("#status-language").text("Javascript+QUnit");
                             runQUnit();
@@ -939,11 +831,7 @@ define(function (require, exports, module) {
                 }
             });
     
-        
-        
-        
-        
-        initializePanel();
+        MyStatusBar.initializePanel();
         
         nodeConnection = new NodeConnection();
         function connect() {
@@ -1139,3 +1027,7 @@ define(function (require, exports, module) {
     exports.determineFileType = determineFileType;
     exports.parseIncludes = parseIncludes;
 });
+
+
+
+

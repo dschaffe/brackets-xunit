@@ -6,6 +6,7 @@
   <link rel="stylesheet" type="text/css" href="jasmine.css">
   <script type="text/javascript" src="jasmine.js"></script>
   <script type="text/javascript" src="jasmine-html.js"></script>
+  <script type="text/javascript" src="jasmineCompleteReporter.js"></script>
   <script src="http://code.jquery.com/jquery-1.9.1.min.js"></script>
   {{{includes}}}
   {{{coverage}}}
@@ -13,19 +14,83 @@
 <body>
 <script type="text/javascript">
     {{{contents}}}
+    
+    
+    
+    
+    var myParent = window.parent;
     var jasmineEnv = jasmine.getEnv();
     jasmineEnv.updateInterval = 1000;
 
     var htmlReporter = new jasmine.HtmlReporter();
+    var reportRunnerResults = htmlReporter.reportRunnerResults;
 
+    htmlReporter.reportRunnerResults = function(runner) {
+        reportRunnerResults(runner);
+    
+        
+       
+        
+        
+        var specs = runner.specs();
+        var specResults;
+        var assertionCount = {total: 0, passed: 0, failed: 0};
+        var result = {};
+        for (var i = 0; i < specs.length; ++i) {
+            if (this.specFilter(specs[i])) {
+                specResults = specs[i].results();
+                assertionCount.total += specResults.totalCount;
+                assertionCount.passed += specResults.passedCount;
+                assertionCount.failed += specResults.failedCount;
+            }
+        }
+    
+        if (console && console.log) {
+            console.log('Total: ' + assertionCount.total);
+            console.log('Passed: ' + assertionCount.passed);
+            console.log('Failed: ' + assertionCount.failed);
+        }
+        
+        
+        if (assertionCount.failed) {
+            result.status = "failed";
+            result.message = assertionCount.failed + " failures";
+        } else {
+            result.status = "passed";
+            result.message = "Success! " + assertionCount.passed + " passed";
+        }
+        
+        if(myParent.reportComplete) {
+            console.log("myParent.reportComplete", result);
+            myParent.reportComplete(result);
+        }
+        
+        var totals = document.querySelectorAll(".grand-total .rs");
+        if(myParent.coverageComplete) {
+            myParent.coverageComplete({
+                message: totals && totals[0] ? totals[0].innerHTML + " coverage" : "No coverage"
+            });
+        }
+        
+    };
+    /*var competeReporter = new getJasmineRequireObj().ConsoleReporter({
+        onComplete: function() {
+            alert("done");
+            debugger;
+            console.log(this);
+        }
+    });
+    
+    jasmineEnv.addReporter(competeReporter);
+    */
     jasmineEnv.addReporter(htmlReporter);
-
+    
     jasmineEnv.specFilter = function(spec) {
         return htmlReporter.specFilter(spec);
     };
 
     var currentWindowOnload = window.onload;
-
+                                                      
     window.onload = function() {
         if (currentWindowOnload) {
             currentWindowOnload();
@@ -34,6 +99,15 @@
     };
 
     function execJasmine() {
+        var oldCallback = jasmineEnv.currentRunner().finishCallback;
+        jasmineEnv.currentRunner().finishCallback = function () {
+            debugger;
+            oldCallback.apply(this, arguments);
+            console.log(this, arguments);
+            
+            htmlReporter.reportRunnerResults();
+           
+        };
         jasmineEnv.execute();
     }
 </script>

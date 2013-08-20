@@ -29,3 +29,8 @@ tests/main.spec/main.spec3.js
 tests/main.spec/main.spec4.js
 
 tests/main.spec/main.spec5.js
+
+samples/jasmine_test/*
+
+samples/qunit_test/*
+

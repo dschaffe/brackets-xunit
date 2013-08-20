@@ -23,10 +23,10 @@
  */
 
 /*jslint vars: true, plusplus: true, devel: true, nomen: true, indent: 4, maxerr: 50 */
-/*global brackets, define, $, window, Mustache, document */
+/*global brackets, define, $, window, Mustache, document, setInterval */
 define(function (require, exports, module) {
     'use strict';
-
+    
     var AppInit             = brackets.getModule("utils/AppInit"),
         CommandManager      = brackets.getModule("command/CommandManager"),
         Dialogs             = brackets.getModule("widgets/Dialogs"),
@@ -34,10 +34,16 @@ define(function (require, exports, module) {
         FileUtils           = brackets.getModule("file/FileUtils"),
         Menus               = brackets.getModule("command/Menus"),
         NativeFileSystem    = brackets.getModule("file/NativeFileSystem").NativeFileSystem,
+        LanguageManager     = brackets.getModule("language/LanguageManager"),
+        
         NodeConnection      = brackets.getModule("utils/NodeConnection"),
         DocumentManager     = brackets.getModule("document/DocumentManager"),
+        EditorManager       = brackets.getModule("editor/EditorManager"),
         ProjectManager      = brackets.getModule("project/ProjectManager"),
-        FileViewController  = brackets.getModule("project/FileViewController");
+        FileViewController  = brackets.getModule("project/FileViewController"),
+        PanelManager        = brackets.getModule("view/PanelManager"),
+        Resizer             = brackets.getModule("utils/Resizer"),
+        StatusBar           = brackets.getModule("widgets/StatusBar");
 
     var moduledir           = FileUtils.getNativeModuleDirectoryPath(module),
         templateEntry       = new NativeFileSystem.FileEntry(moduledir + '/templates/jasmineNodeReportTemplate.html'),
@@ -58,8 +64,112 @@ define(function (require, exports, module) {
         nodeConnection      = new NodeConnection(),
         _windows            = {},
         testFileIndex       = 0,
-        enableHtml          = false;
+        enableHtml          = false,
+        $xunitResults       = {},
+        _collapsed          = false,
+        jsXunitTemplate     = require("text!templates/panel.html?u=1"),
+        $selectedRow,
+        _xunit_panel_visible;
+        
+    
+        
 
+    function toggleCollapsed(collapsed) {
+        if (collapsed === undefined) {
+            collapsed = !_collapsed;
+        }
+        
+        _collapsed = collapsed;
+        if (_collapsed) {
+            Resizer.hide($xunitResults);
+        } else {
+            //if (JSLINT.errors && JSLINT.errors.length) {
+            Resizer.show($xunitResults);
+            //}
+        }
+    }
+    
+    function statusPassed(message) {
+        StatusBar.updateIndicator("XUNIT", true, "xunit-failed", 'Failed');
+        $("#XUNIT").text(message);
+    }
+    function statusFailed(message) {
+        StatusBar.updateIndicator("XUNIT", true, "xunit-complete", 'Complete');
+        $("#XUNIT").text(message);
+    }
+    function statusRunning(message) {
+        message = message || "running";
+        StatusBar.updateIndicator("XUNIT", true, "xunit-process", 'Running');
+        $("#XUNIT").text(message);
+    }
+    function statusCoverage(message) {
+        StatusBar.updateIndicator("XUNITCOVERAGE", true, "xunit-complete", 'Complete');
+        $("#XUNITCOVERAGE").text(message);
+    }
+    
+    
+    function initializePanel() {
+        console.log("renderPanel");
+        var xunitHtml = Mustache.render(jsXunitTemplate, {});
+        var xunitPanel = PanelManager.createBottomPanel("xunit.results", $(xunitHtml), 100);
+        $xunitResults = $("#xunit-results");
+        
+        var xunitStatusHtml = $("<div id=\"xunit-status\" title=\"No xunit errors\">No tests</div>", {}),
+            xunitCoverageHtml = $("<div id=\"xunit-coverage\" title=\"No coverage\">No coverage</div>", {});
+        $(xunitStatusHtml).insertBefore("#jslint-status");
+        $(xunitCoverageHtml).insertBefore("#jslint-status");
+        StatusBar.addIndicator("XUNIT", $("#xunit-status"));
+        StatusBar.addIndicator("XUNITCOVERAGE", $("#xunit-coverage"));
+        StatusBar.updateIndicator("XUNIT", true, "xunit-disabled", 'Xunit');
+        StatusBar.updateIndicator("XUNITCOVERAGE", true, "xunit-disabled", 'Xunit');
+
+        //panel.show();
+        
+        $("#xunit-results .close").click(function () {
+            toggleCollapsed(true);
+        });
+
+        $("#XUNIT, #XUNITCOVERAGE").click(function () {
+            /*if (!$(this).hasClass('xunit-disabled')) {
+                if (_xunit_panel_visible) {
+                    //Resizer.hide($karmaResults);
+                    _xunit_panel_visible = false;
+                    //} else {
+                    //showPanel();
+                    
+                }
+            }*/
+            toggleCollapsed();
+        });
+        toggleCollapsed(true);
+    }
+    function renderPanel() {
+        
+        $xunitResults
+                .find(".table-container")
+                .empty()
+                .append($("<h1>HI</h1>"))
+                .scrollTop(0)  // otherwise scroll pos from previous contents is remembered
+                .on("click",
+                    function (e) {
+                    if ($selectedRow) {
+                        $selectedRow.removeClass("selected");
+                    }
+    
+                    $selectedRow  = $(e.target).closest("tr");
+                    $selectedRow.addClass("selected");
+                    var lineTd    = $selectedRow.find("td.line");
+                    var line      = lineTd.text();
+                    var character = lineTd.data("character");
+    
+                    var editor = EditorManager.getCurrentFullEditor();
+                    editor.setCursorPos(line - 1, character - 1, true);
+                    EditorManager.focusEditor();
+                });
+
+       
+    }
+    
     /* display a modal dialog
      * title: string  
      * message: string
@@ -143,7 +253,9 @@ define(function (require, exports, module) {
     }
  
     // Execute Jasmine test
-    function runJasmine() {
+    function runJasmine(callback) {
+        console.log("runJasmine");
+        renderPanel();
         var entry = ProjectManager.getSelectedItem();
         if (entry === undefined) {
             entry = DocumentManager.getCurrentDocument().file;
@@ -207,11 +319,22 @@ define(function (require, exports, module) {
                                             FileUtils.readAsText(apiFileEntry).done(function (text, modtime) {
                                                 FileUtils.writeText(apiNewFileEntry, text).done(function () {
                                                     var reportWin = window.open(jasmineHtmlEntry.fullPath);
+                                                    if (callback) {
+                                                        reportWin.onload = function () {
+                                                            callback(reportWin);
+                                                        };
+                                                    }
                                                     reportWin.focus();
+                                                    
                                                 });
                                             });
                                         } else {
                                             var reportWin = window.open(jasmineHtmlEntry.fullPath);
+                                            if (callback) {
+                                                reportWin.onload = function () {
+                                                    callback(reportWin);
+                                                };
+                                            }
                                             reportWin.focus();
                                         }
                                     });
@@ -260,7 +383,7 @@ define(function (require, exports, module) {
             includes = parseIncludes(contents, dir, new Date().getTime());
         var data = { filename : entry.name,
                      title : 'QUnit test - ' + entry.name,
-                     includes : includes,
+                     includes : includes + "<script src='qunit.js'></script>",
                      templatedir : moduledir,
                      contents : contents,
                      coverage: (useCodeCoverage ? "<script src='qunit.blanket.js'></script>" : "")
@@ -268,14 +391,36 @@ define(function (require, exports, module) {
         var template = require("text!templates/qunit.html");
         var html = Mustache.render(template, data),
         // write generated test report to file on disk
+            qunitJs = require("text!thirdparty/test/qunit.js"),
+            qunitJsEntry = new NativeFileSystem.FileEntry(dir + testBase + "/qunit.js"),
             qunitJsBlanket = require("text!templates/qunit.blanket.js"),
             qunitJsBlanketEntry = new NativeFileSystem.FileEntry(dir + testBase + "/qunit.blanket.js");
         dirEntry.getDirectory(dir + testBase, {create: true}, function () {
-            FileUtils.writeText(qunitJsBlanketEntry, qunitJsBlanket).done(function () {
-                FileUtils.writeText(qunitReportEntry, html).done(function () {
-                    // launch new window with generated report
-                    var report = window.open(qunitReportEntry.fullPath + (useCodeCoverage ? "?coverage=true" : ""));
-                    report.focus();
+            FileUtils.writeText(qunitJsEntry, qunitJs).done(function () {
+                FileUtils.writeText(qunitJsBlanketEntry, qunitJsBlanket).done(function () {
+                    FileUtils.writeText(qunitReportEntry, html).done(function () {
+                        // launch new window with generated report
+                        var urlToReport = qunitReportEntry.fullPath + (useCodeCoverage ? "?coverage=true" : ""),
+                            $frame = $xunitResults.find("#winReport"),
+                            inter;
+                        window.reportComplete = function(result) {
+                            if(result.status === "failed") {
+                                statusFailed(result.message);
+                                toggleCollapsed(false);
+                            } else {
+                                statusPassed(result.message);   
+                            }
+                        };
+                        window.reportUpdate = function(result) {
+                            console.log("update", result);
+                            statusRunning(result.message);
+                        };
+                        window.coverageComplete = function(result) {
+                            statusCoverage(result.message);   
+                        };
+                        $frame.attr("src", urlToReport);
+                        
+                    });
                 });
             });
         });
@@ -616,8 +761,190 @@ define(function (require, exports, module) {
         return result;
     }
 
+    
+        
+    /**
+     * Wait until the test condition is true or a timeout occurs. Useful for waiting
+     * on a server response or for a ui change (fadeIn, etc.) to occur.
+     *
+     * @param testFx javascript condition that evaluates to a boolean,
+     * it can be passed in as a string (e.g.: "1 == 1" or "$('#bar').is(':visible')" or
+     * as a callback function.
+     * @param onReady what to do when testFx condition is fulfilled,
+     * it can be passed in as a string (e.g.: "1 == 1" or "$('#bar').is(':visible')" or
+     * as a callback function.
+     * @param timeOutMillis the max amount of time to wait. If not specified, 3 sec is used.
+     */
+    function waitFor(testFx, onReady, timeOutMillis) {
+        var maxtimeOutMillis = timeOutMillis || 30001, //< Default Max Timout is 3s
+            start = new Date().getTime(),
+            condition = false,
+            interval = setInterval(function () {
+                if ((new Date().getTime() - start < maxtimeOutMillis) && !condition) {
+                    // If not time-out yet and condition not yet fulfilled
+                    condition = (typeof (testFx) === "string" ? eval(testFx) : testFx()); //< defensive code
+                } else {
+                    if (!condition) {
+                        // If condition still not fulfilled (timeout but condition is 'false')
+                        console.log("'waitFor()' timeout");
+                        //phantom.exit(1);
+                    } else {
+                        // Condition fulfilled (timeout and/or condition is 'true')
+                        console.log("'waitFor()' finished in " + (new Date().getTime() - start) + "ms.");
+                        typeof (onReady) === "string" ? eval(onReady) : onReady(); //< Do what it's supposed to do once the condition is fulfilled
+                        clearInterval(interval); //< Stop this interval
+                    }
+                }
+            }, 100); //< repeat check every 250ms
+    }
+    
+    // reads config.js to determine if brackets-xunit should be disabled for the current project     
+    function readConfig() {
+        var result = new $.Deferred();
+        var root = ProjectManager.getProjectRoot(),
+            configEntry = new NativeFileSystem.FileEntry(root.fullPath + "config.js");
+        FileUtils.readAsText(configEntry).done(function (text, timestamp) {
+            try {
+                var config = JSON.parse(text);
+                if (config.hasOwnProperty('brackets-xunit') && config['brackets-xunit'] === 'disable') {
+                    result.reject('disabled');
+                }
+            } catch (e) {
+                console.log("[brackets-xunit] reading " + root.fullPath + "config.js Error " + e);
+            } finally {
+                return result.resolve('ok');
+            }
+        }).fail(function (error) {
+            return result.resolve('ok');
+        });
+        return result.promise();
+    }
+    
+    // determine if a file is a known test type
+    // first look for brackets-xunit: [type], takes precedence
+    // next look for distinguishing clues in the file:
+    //   YUI: 'YUI(' and 'Test.runner.test'
+    //   jasmine: 'describe' and 'it'
+    //   QUnit: 'test()' and 'it()'
+    function determineFileType(fileEntry, text) {
+        if (text && text.match(/^#!/) !== null) {
+            return "script";
+        } else if (text && fileEntry && fileEntry.fullPath && fileEntry.fullPath.match(/\.js$/)) {
+            if (text.match(/brackets-xunit:\s*yui/i) !== null) {
+                return "yui";
+            } else if (text.match(/define\(/i) && text.match(/describe\s*\(/)) {
+                return "jasmine";
+            } else if (text.match(/brackets-xunit:\s*jasmine-node/i)) {
+                return "node";
+            } else if (text.match(/brackets-xunit:\s*jasmine/i) !== null) {
+                return "jasmine";
+            } else if (text.match(/brackets-xunit:\s*qunit/i) !== null) {
+                return "qunit";
+            } else if (text.match(/describe\s*\(/) && text.match(/it\s*\(/)) {
+                return "jasmine";
+            } else if (text.match(/YUI\s*\(/) && text.match(/Test\.Runner\.run\s*\(/)) {
+                return "yui";
+            } else if (text.match(/test\s*\(/) && text.match(/ok\s*\(/)) {
+                return "qunit";
+            } else {
+                return "generate";
+            }
+        } else if (fileEntry && fileEntry.fullPath && fileEntry.fullPath.match(/\.html$/)) {
+            return "html";
+        } else {
+            return "unknown";
+        }
+    }
+    /*
+     * cleanMenu - removes all brackets-xunit menu items from a menu
+     * parameters: menu - the WorkingSetMenu or the ProjectMenu
+     */
+    function cleanMenu(menu) {
+        var i;
+        for (i = 0; i < commands.length; i++) {
+            menu.removeMenuItem(commands[i]);
+        }
+    }
+    /*
+     * checkFileTypes - adds a menuitem to a menu if the current file matches a known type
+     * parameters: menu - the context menu or working files menu
+     *             entry - the current file entry object containing the file name
+     *             text - the contents of the current file
+     */
+    function checkFileTypes(menu, entry, text) {
+        if (entry === null) {
+            return "unknown";
+        }
+        var type = determineFileType(entry, text);
+        if (type === "yui") {
+            menu.addMenuItem(YUITEST_CMD, "", Menus.LAST);
+        } else if (type === "jasmine") {
+            menu.addMenuItem(JASMINETEST_CMD, "", Menus.LAST);
+        } else if (type === "qunit") {
+            menu.addMenuItem(QUNITTEST_CMD, "", Menus.LAST);
+        } else if (type === "script") {
+            menu.addMenuItem(SCRIPT_CMD, "", Menus.LAST);
+        } else if (type === "node") {
+            menu.addMenuItem(NODETEST_CMD, "", Menus.LAST);
+        } else if (enableHtml && type === "html") {
+            menu.addMenuItem(VIEWHTML_CMD, "", Menus.LAST);
+        }
+        if (type === "generate") {
+            menu.addMenuItem(GENERATE_JASMINE_CMD, "", Menus.LAST);
+            menu.addMenuItem(GENERATE_QUNIT_CMD, "", Menus.LAST);
+            menu.addMenuItem(GENERATE_YUI_CMD, "", Menus.LAST);
+        }
+    }
     // setup, connects to the node server loads node/JasmineDomain and node/ProcessDomain
     AppInit.appReady(function () {
+        $(DocumentManager)
+            .on("documentSaved.xunit", function (event, document) {
+                
+                
+                var language = document ? LanguageManager.getLanguageForPath(document.file.fullPath) : "";
+                if (language && language.getId() === "javascript") {
+                    
+                    var selectedEntry = DocumentManager.getCurrentDocument().file,
+                        text = DocumentManager.getCurrentDocument().getText(),
+                        type;
+                    readConfig().done(function () {
+                        
+                        type = determineFileType(selectedEntry, text);
+                        if (type === "yui") {
+                            $("#status-language").text("Javascript+YUI");
+                            runYUI();
+                        } else if (type === "jasmine") {
+                            $("#status-language").text("Javascript+Jasmine");
+                            runJasmine(function (win) {
+                                statusRunning();
+                                waitFor(function () {
+                                    return win.document.body.querySelector('.bar');
+                                }, function () {
+                                    var status = win.document.body.querySelector('.bar').innerText;
+                                    if (win.document.body.querySelector('.passingAlert')) {
+                                        statusPassed(status);
+                                    } else {
+                                        statusFailed(status);
+                                    }
+                                    console.log(status);
+                                    win.close();
+                                });
+                            });
+                        } else if (type === "qunit") {
+                            $("#status-language").text("Javascript+QUnit");
+                            runQUnit();
+                        }
+                        
+                    });
+                }
+            });
+    
+        
+        
+        
+        
+        initializePanel();
+        
         nodeConnection = new NodeConnection();
         function connect() {
             var connectionPromise = nodeConnection.connect(true);
@@ -769,103 +1096,8 @@ define(function (require, exports, module) {
         chain(connect, loadJasmineDomain, loadProcessDomain);
     });
 
-    // reads config.js to determine if brackets-xunit should be disabled for the current project     
-    function readConfig() {
-        var result = new $.Deferred();
-        var root = ProjectManager.getProjectRoot(),
-            configEntry = new NativeFileSystem.FileEntry(root.fullPath + "config.js");
-        FileUtils.readAsText(configEntry).done(function (text, timestamp) {
-            try {
-                var config = JSON.parse(text);
-                if (config.hasOwnProperty('brackets-xunit') && config['brackets-xunit'] === 'disable') {
-                    result.reject('disabled');
-                }
-            } catch (e) {
-                console.log("[brackets-xunit] reading " + root.fullPath + "config.js Error " + e);
-            } finally {
-                return result.resolve('ok');
-            }
-        }).fail(function (error) {
-            return result.resolve('ok');
-        });
-        return result.promise();
-    }
+   
 
-    // determine if a file is a known test type
-    // first look for brackets-xunit: [type], takes precedence
-    // next look for distinguishing clues in the file:
-    //   YUI: 'YUI(' and 'Test.runner.test'
-    //   jasmine: 'describe' and 'it'
-    //   QUnit: 'test()' and 'it()'
-    function determineFileType(fileEntry, text) {
-        if (text && text.match(/^#!/) !== null) {
-            return "script";
-        } else if (text && fileEntry && fileEntry.fullPath && fileEntry.fullPath.match(/\.js$/)) {
-            if (text.match(/brackets-xunit:\s*yui/i) !== null) {
-                return "yui";
-            } else if (text.match(/define\(/i) && text.match(/describe\s*\(/)) {
-                return "jasmine";
-            } else if (text.match(/brackets-xunit:\s*jasmine-node/i)) {
-                return "node";
-            } else if (text.match(/brackets-xunit:\s*jasmine/i) !== null) {
-                return "jasmine";
-            } else if (text.match(/brackets-xunit:\s*qunit/i) !== null) {
-                return "qunit";
-            } else if (text.match(/describe\s*\(/) && text.match(/it\s*\(/)) {
-                return "jasmine";
-            } else if (text.match(/YUI\s*\(/) && text.match(/Test\.Runner\.run\s*\(/)) {
-                return "yui";
-            } else if (text.match(/test\s*\(/) && text.match(/ok\s*\(/)) {
-                return "qunit";
-            } else {
-                return "generate";
-            }
-        } else if (fileEntry && fileEntry.fullPath && fileEntry.fullPath.match(/\.html$/)) {
-            return "html";
-        } else {
-            return "unknown";
-        }
-    }
-    /*
-     * cleanMenu - removes all brackets-xunit menu items from a menu
-     * parameters: menu - the WorkingSetMenu or the ProjectMenu
-     */
-    function cleanMenu(menu) {
-        var i;
-        for (i = 0; i < commands.length; i++) {
-            menu.removeMenuItem(commands[i]);
-        }
-    }
-    /*
-     * checkFileTypes - adds a menuitem to a menu if the current file matches a known type
-     * parameters: menu - the context menu or working files menu
-     *             entry - the current file entry object containing the file name
-     *             text - the contents of the current file
-     */
-    function checkFileTypes(menu, entry, text) {
-        if (entry === null) {
-            return "unknown";
-        }
-        var type = determineFileType(entry, text);
-        if (type === "yui") {
-            menu.addMenuItem(YUITEST_CMD, "", Menus.LAST);
-        } else if (type === "jasmine") {
-            menu.addMenuItem(JASMINETEST_CMD, "", Menus.LAST);
-        } else if (type === "qunit") {
-            menu.addMenuItem(QUNITTEST_CMD, "", Menus.LAST);
-        } else if (type === "script") {
-            menu.addMenuItem(SCRIPT_CMD, "", Menus.LAST);
-        } else if (type === "node") {
-            menu.addMenuItem(NODETEST_CMD, "", Menus.LAST);
-        } else if (enableHtml && type === "html") {
-            menu.addMenuItem(VIEWHTML_CMD, "", Menus.LAST);
-        }
-        if (type === "generate") {
-            menu.addMenuItem(GENERATE_JASMINE_CMD, "", Menus.LAST);
-            menu.addMenuItem(GENERATE_QUNIT_CMD, "", Menus.LAST);
-            menu.addMenuItem(GENERATE_YUI_CMD, "", Menus.LAST);
-        }
-    }
 
     // Register commands as right click menu items
     commands = [ YUITEST_CMD, JASMINETEST_CMD, QUNITTEST_CMD, SCRIPT_CMD, NODETEST_CMD, GENERATE_JASMINE_CMD,
@@ -892,6 +1124,7 @@ define(function (require, exports, module) {
             checkFileTypes(projectMenu, selectedEntry, text);
         });
     });
+    
     // check if the extension should add a menu item to the workingset menu (under Working Files, left panel)
     $(workingsetMenu).on("beforeContextMenuOpen", function (evt) {
         var selectedEntry = DocumentManager.getCurrentDocument().file,

@@ -73,16 +73,7 @@
         }
         
     };
-    /*var competeReporter = new getJasmineRequireObj().ConsoleReporter({
-        onComplete: function() {
-            alert("done");
-            debugger;
-            console.log(this);
-        }
-    });
-    
-    jasmineEnv.addReporter(competeReporter);
-    */
+   
     jasmineEnv.addReporter(htmlReporter);
     
     jasmineEnv.specFilter = function(spec) {
@@ -101,7 +92,6 @@
     function execJasmine() {
         var oldCallback = jasmineEnv.currentRunner().finishCallback;
         jasmineEnv.currentRunner().finishCallback = function () {
-            debugger;
             oldCallback.apply(this, arguments);
             console.log(this, arguments);
             

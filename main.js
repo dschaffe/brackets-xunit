@@ -147,10 +147,11 @@ define(function (require, exports, module) {
                    };
         var template = require("text!templates/yui.html");
         var html = Mustache.render(template, data);
+        var useCodeCoverage = true;
         dirEntry.getDirectory(dir + testBase, {create: true}, function () {
             FileUtils.writeText(yuiReportEntry, html).done(function () {
-                var report = window.open(yuiReportEntry.fullPath);
-                report.focus();
+                var urlToReport = yuiReportEntry.fullPath + (useCodeCoverage ? "?coverage=true" : "");
+                MyStatusBar.setReportWindow(urlToReport);
             });
         });
     }
@@ -795,34 +796,48 @@ define(function (require, exports, module) {
         };
         
         
-        $(DocumentManager)
-            .on("documentSaved.xunit", function (event, document) {
+        function runTestsOnSaveOrChange(document) {
                 
                 
-                var language = document ? LanguageManager.getLanguageForPath(document.file.fullPath) : "";
-                if (language && language.getId() === "javascript") {
+            var language = document ? LanguageManager.getLanguageForPath(document.file.fullPath) : "";
+            if (language && language.getId() === "javascript") {
+                
+                var selectedEntry = document.file,
+                    text = document.getText(),
+                    type;
+                readConfig().done(function () {
                     
-                    var selectedEntry = DocumentManager.getCurrentDocument().file,
-                        text = DocumentManager.getCurrentDocument().getText(),
-                        type;
-                    readConfig().done(function () {
-                        
-                        type = determineFileType(selectedEntry, text);
-                        if (type === "yui") {
-                            $("#status-language").text("Javascript+YUI");
-                            runYUI();
-                        } else if (type === "jasmine") {
-                            $("#status-language").text("Javascript+Jasmine");
-                            runJasmine();
-                        } else if (type === "qunit") {
-                            $("#status-language").text("Javascript+QUnit");
-                            runQUnit();
-                        }
-                        
-                    });
-                }
+                    type = determineFileType(selectedEntry, text);
+                    if (type === "yui") {
+                        $("#status-language").text("Javascript+YUI");
+                        runYUI();
+                    } else if (type === "jasmine") {
+                        $("#status-language").text("Javascript+Jasmine");
+                        runJasmine();
+                    } else if (type === "qunit") {
+                        $("#status-language").text("Javascript+QUnit");
+                        runQUnit();
+                    }
+                    
+                });
+            }
+        }
+        
+        $(DocumentManager)
+            .on("documentSaved.xunit", function(e, d) { 
+                runTestsOnSaveOrChange(d);
             });
+        /*$(DocumentManager)
+            .on("documentRefreshed.xunit", function(e, d) { 
+                runTestsOnSaveOrChange(d);
+            });*/
+        
     
+        $(DocumentManager)
+            .on("currentDocumentChange", function() {
+                runTestsOnSaveOrChange(DocumentManager.getCurrentDocument());
+            });
+        
         MyStatusBar.initializePanel();
         
         nodeConnection = new NodeConnection();

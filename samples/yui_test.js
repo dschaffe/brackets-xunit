@@ -15,9 +15,12 @@ YUI({ logInclude: {TestRunner: true }}).use('test', 'test-console', function (Y)
             Y.Assert.areEqual(28, this.data.age, "Age should be 28");
         }
     });
+    
     Y.Test.Runner.add(testCase);
     (new Y.Test.Console({
         newestOnTop: false
     })).render('#log');
+    
     Y.Test.Runner.run();
+    
 });

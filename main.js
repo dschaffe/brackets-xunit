@@ -34,6 +34,8 @@ define(function (require, exports, module) {
         FileUtils           = brackets.getModule("file/FileUtils"),
         Menus               = brackets.getModule("command/Menus"),
         NativeFileSystem    = brackets.getModule("file/NativeFileSystem").NativeFileSystem,
+        Directory           = brackets.getModule("filesystem/Directory"),
+        FileSystem          = brackets.getModule("filesystem/FileSystem"),
         LanguageManager     = brackets.getModule("language/LanguageManager"),
         
         NodeConnection      = brackets.getModule("utils/NodeConnection"),
@@ -47,8 +49,8 @@ define(function (require, exports, module) {
         MyStatusBar         = require("MyStatusBar");
 
     var moduledir           = FileUtils.getNativeModuleDirectoryPath(module),
-        templateEntry       = new NativeFileSystem.FileEntry(moduledir + '/templates/jasmineNodeReportTemplate.html'),
-        reportJasNodeEntry  = new NativeFileSystem.FileEntry(moduledir + '/node/reports/jasmineReport.html'),
+        templateEntry       = FileSystem.getFileForPath(moduledir + '/templates/jasmineNodeReportTemplate.html'),
+        reportJasNodeEntry  = FileSystem.getFileForPath(moduledir + '/node/reports/jasmineReport.html'),
         COMMAND_ID          = "BracketsXUnit.BracketsXUnit",
         commands            = [],
         YUITEST_CMD         = "yuitest_cmd",
@@ -132,12 +134,12 @@ define(function (require, exports, module) {
             entry = DocumentManager.getCurrentDocument().file;
         }
         var dir = entry.fullPath.substring(0, entry.fullPath.lastIndexOf('/') + 1),
-            dirEntry = new NativeFileSystem.DirectoryEntry(dir),
+            dirEntry = FileSystem.getDirectoryForPath(dir),
             fname = DocumentManager.getCurrentDocument().filename,
             contents = DocumentManager.getCurrentDocument().getText(),
             testName = entry.fullPath.substring(entry.fullPath.lastIndexOf("/") + 1),
             testBase = testName.substring(0, testName.lastIndexOf('.')),
-            yuiReportEntry = new NativeFileSystem.FileEntry(dir + testBase + '/yuiReport.html'),
+            yuiReportEntry = FileSystem.getFileForPath(dir + testBase + '/yuiReport.html'),
             includes = parseIncludes(contents, dir),
             data = { filename : entry.name,
                      title : 'YUI test - ' + entry.name,
@@ -148,7 +150,7 @@ define(function (require, exports, module) {
         var template = require("text!templates/yui.html");
         var html = Mustache.render(template, data);
         var useCodeCoverage = true;
-        dirEntry.getDirectory(dir + testBase, {create: true}, function () {
+        Directory.create(dir + testBase, function () {
             FileUtils.writeText(yuiReportEntry, html).done(function () {
                 var urlToReport = yuiReportEntry.fullPath + (useCodeCoverage ? "?coverage=true" : "");
                 MyStatusBar.setReportWindow(urlToReport);
@@ -164,7 +166,7 @@ define(function (require, exports, module) {
             entry = DocumentManager.getCurrentDocument().file;
         }
         var dir = entry.fullPath.substring(0, entry.fullPath.lastIndexOf('/') + 1),
-            dirEntry = new NativeFileSystem.DirectoryEntry(dir),
+            dirEntry = FileSystem.getDirectoryForPath(dir),
             testName = entry.fullPath.substring(entry.fullPath.lastIndexOf("/") + 1),
             testBase = testName.substring(0, testName.lastIndexOf('.')),
             newTestName = testBase + (testFileIndex++) + ".js",
@@ -172,26 +174,26 @@ define(function (require, exports, module) {
             includes = parseIncludes(contents, dir),
             relpath = entry.fullPath.substring(ProjectManager.getInitialProjectPath().length - 1),
             jasmineTestName = dir + testBase + '/' + newTestName,
-            jasmineTestEntry = new NativeFileSystem.FileEntry(jasmineTestName),
+            jasmineTestEntry = FileSystem.getFileForPath(jasmineTestName),
             jasmineHtmlName = dir + testBase + "/" + testBase + ".html",
-            jasmineHtmlEntry = new NativeFileSystem.FileEntry(jasmineHtmlName),
+            jasmineHtmlEntry = FileSystem.getFileForPath(jasmineHtmlName),
             jasmineCss = require("text!templates/jasmine.css"),
-            jasmineCssEntry = new NativeFileSystem.FileEntry(dir + testBase + "/jasmine.css"),
+            jasmineCssEntry = FileSystem.getFileForPath(dir + testBase + "/jasmine.css"),
             jasmineJs = require("text!templates/jasmine.js"),
-            jasmineJsEntry = new NativeFileSystem.FileEntry(dir + testBase + "/jasmine.js"),
+            jasmineJsEntry = FileSystem.getFileForPath(dir + testBase + "/jasmine.js"),
             jasmineJsReporter = require("text!templates/jasmineCompleteReporter.js"),
-            jasmineJsReporterEntry = new NativeFileSystem.FileEntry(dir + testBase + "/jasmineCompleteReporter.js"),
+            jasmineJsReporterEntry = FileSystem.getFileForPath(dir + testBase + "/jasmineCompleteReporter.js"),
             jasmineJsHtml = require("text!templates/jasmine-html.js"),
-            jasmineJsHtmlEntry = new NativeFileSystem.FileEntry(dir + testBase + "/jasmine-html.js"),
+            jasmineJsHtmlEntry = FileSystem.getFileForPath(dir + testBase + "/jasmine-html.js"),
             jasmineJsBlanket = require("text!templates/jasmine.blanket.js"),
-            jasmineJsBlanketEntry = new NativeFileSystem.FileEntry(dir + testBase + "/jasmine.blanket.js"),
+            jasmineJsBlanketEntry = FileSystem.getFileForPath(dir + testBase + "/jasmine.blanket.js"),
             requireSrc = require("text!node/node_modules/jasmine-node/node_modules/requirejs/require.js"),
-            requireSrcEntry = new NativeFileSystem.FileEntry(dir + testBase + "/require.js");
+            requireSrcEntry = FileSystem.getFileForPath(dir + testBase + "/require.js");
         var apiFile = contents.match(/require\('\.\/[A-Za-z0-9\-]+\.js/);
         
         
         
-        dirEntry.getDirectory(testBase, {create: true}, function () {
+        Directory.create(testBase, function () {
             var useCodeCoverage = true,
                 data = {
                     filename : entry.name,
@@ -212,20 +214,20 @@ define(function (require, exports, module) {
                 html = Mustache.render(template, data);
             }
             
-             $.when(
-                 FileUtils.writeText(jasmineTestEntry, contents),
-                 FileUtils.writeText(jasmineHtmlEntry, html),
-                 FileUtils.writeText(jasmineCssEntry, jasmineCss),
-                 FileUtils.writeText(jasmineJsEntry, jasmineJs),
-                 FileUtils.writeText(jasmineJsReporterEntry, jasmineJsReporter),
-                 FileUtils.writeText(requireSrcEntry, requireSrc),
-                 FileUtils.writeText(jasmineJsBlanketEntry, jasmineJsBlanket),
-                 FileUtils.writeText(jasmineJsHtmlEntry, jasmineJsHtml)
-             ).done(function(){
+            $.when(
+                FileUtils.writeText(jasmineTestEntry, contents),
+                FileUtils.writeText(jasmineHtmlEntry, html),
+                FileUtils.writeText(jasmineCssEntry, jasmineCss),
+                FileUtils.writeText(jasmineJsEntry, jasmineJs),
+                FileUtils.writeText(jasmineJsReporterEntry, jasmineJsReporter),
+                FileUtils.writeText(requireSrcEntry, requireSrc),
+                FileUtils.writeText(jasmineJsBlanketEntry, jasmineJsBlanket),
+                FileUtils.writeText(jasmineJsHtmlEntry, jasmineJsHtml)
+            ).done(function () {
                 if (apiFile) {
                     var apiFileName = apiFile[0].substring(11),
-                        apiFileEntry = new NativeFileSystem.FileEntry(dir + apiFileName),
-                        apiNewFileEntry = new NativeFileSystem.FileEntry(dir + testBase + '/' + apiFileName);
+                        apiFileEntry = FileSystem.getFileForPath(dir + apiFileName),
+                        apiNewFileEntry = FileSystem.getFileForPath(dir + testBase + '/' + apiFileName);
                     FileUtils.readAsText(apiFileEntry).done(function (text, modtime) {
                         FileUtils.writeText(apiNewFileEntry, text).done(function () {
                             var urlToReport = jasmineHtmlEntry.fullPath + (useCodeCoverage ? "?coverage=true" : "");
@@ -269,12 +271,12 @@ define(function (require, exports, module) {
             entry = DocumentManager.getCurrentDocument().file;
         }
         var dir = entry.fullPath.substring(0, entry.fullPath.lastIndexOf('/') + 1),
-            dirEntry = new NativeFileSystem.DirectoryEntry(dir),
+            dirEntry = FileSystem.getDirectoryForPath(dir),
             fname = DocumentManager.getCurrentDocument().filename,
             contents = DocumentManager.getCurrentDocument().getText(),
             testName = entry.fullPath.substring(entry.fullPath.lastIndexOf("/") + 1),
             testBase = testName.substring(0, testName.lastIndexOf('.')),
-            qunitReportEntry = new NativeFileSystem.FileEntry(dir + testBase + '/qUnitReport.html'),
+            qunitReportEntry = FileSystem.getFileForPath(dir + testBase + '/qUnitReport.html'),
             useCodeCoverage = true,
             includes = parseIncludes(contents, dir, new Date().getTime());
         var data = { filename : entry.name,
@@ -288,16 +290,16 @@ define(function (require, exports, module) {
         var html = Mustache.render(template, data),
         // write generated test report to file on disk
             qunitJs = require("text!thirdparty/test/qunit.js"),
-            qunitJsEntry = new NativeFileSystem.FileEntry(dir + testBase + "/qunit.js"),
+            qunitJsEntry = FileSystem.getFileForPath(dir + testBase + "/qunit.js"),
             qunitJsBlanket = require("text!templates/qunit.blanket.js"),
-            qunitJsBlanketEntry = new NativeFileSystem.FileEntry(dir + testBase + "/qunit.blanket.js");
-        dirEntry.getDirectory(dir + testBase, {create: true}, function () {
+            qunitJsBlanketEntry = FileSystem.getFileForPath(dir + testBase + "/qunit.blanket.js");
+        Directory.create(dir + testBase, function () {
             $.when(
                 FileUtils.writeText(qunitJsEntry, qunitJs),
                 FileUtils.writeText(qunitJsBlanketEntry, qunitJsBlanket),
                 FileUtils.writeText(qunitReportEntry, html)
-            ).done(function(){
-                var urlToReport = qunitReportEntry.fullPath + (useCodeCoverage ? "?coverage=true" : "");            
+            ).done(function () {
+                var urlToReport = qunitReportEntry.fullPath + (useCodeCoverage ? "?coverage=true" : "");
                 MyStatusBar.setReportWindow(urlToReport);
             });
             
@@ -377,7 +379,7 @@ define(function (require, exports, module) {
         function _getUntitledFileSuggestion(dir, baseFileName, fileExt, isFolder) {
             var result = new $.Deferred();
             var suggestedName = baseFileName + fileExt;
-            var dirEntry = new NativeFileSystem.DirectoryEntry(dir);
+            var dirEntry = FileSystem.getDirectoryForPath(dir);
 
             result.progress(function attemptNewName(suggestedName, nextIndexToUse) {
                 if (nextIndexToUse > 99) {
@@ -680,7 +682,7 @@ define(function (require, exports, module) {
     function readConfig() {
         var result = new $.Deferred();
         var root = ProjectManager.getProjectRoot(),
-            configEntry = new NativeFileSystem.FileEntry(root.fullPath + "config.js");
+            configEntry = FileSystem.getFileForPath(root.fullPath + "config.js");
         FileUtils.readAsText(configEntry).done(function (text, timestamp) {
             try {
                 var config = JSON.parse(text);
@@ -824,7 +826,7 @@ define(function (require, exports, module) {
         }
         
         $(DocumentManager)
-            .on("documentSaved.xunit", function(e, d) { 
+            .on("documentSaved.xunit", function (e, d) {
                 runTestsOnSaveOrChange(d);
             });
         /*$(DocumentManager)
@@ -834,7 +836,7 @@ define(function (require, exports, module) {
         
     
         $(DocumentManager)
-            .on("currentDocumentChange", function() {
+            .on("currentDocumentChange", function () {
                 runTestsOnSaveOrChange(DocumentManager.getCurrentDocument());
             });
         

@@ -150,7 +150,7 @@ define(function (require, exports, module) {
         var template = require("text!templates/yui.html");
         var html = Mustache.render(template, data);
         var useCodeCoverage = true;
-        Directory.create(dir + testBase, function () {
+        FileSystem.getDirectoryForPath(dir + testBase).create(function () {
             FileUtils.writeText(yuiReportEntry, html).done(function () {
                 var urlToReport = yuiReportEntry.fullPath + (useCodeCoverage ? "?coverage=true" : "");
                 MyStatusBar.setReportWindow(urlToReport);
@@ -193,7 +193,7 @@ define(function (require, exports, module) {
         
         
         
-        Directory.create(testBase, function () {
+        FileSystem.getDirectoryForPath(testBase).create(function () {
             var useCodeCoverage = true,
                 data = {
                     filename : entry.name,
@@ -293,7 +293,7 @@ define(function (require, exports, module) {
             qunitJsEntry = FileSystem.getFileForPath(dir + testBase + "/qunit.js"),
             qunitJsBlanket = require("text!templates/qunit.blanket.js"),
             qunitJsBlanketEntry = FileSystem.getFileForPath(dir + testBase + "/qunit.blanket.js");
-        Directory.create(dir + testBase, function () {
+        FileSystem.getDirectoryForPath(dir + testBase).create(function () {
             $.when(
                 FileUtils.writeText(qunitJsEntry, qunitJs),
                 FileUtils.writeText(qunitJsBlanketEntry, qunitJsBlanket),

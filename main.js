@@ -33,7 +33,6 @@ define(function (require, exports, module) {
         ExtensionUtils      = brackets.getModule("utils/ExtensionUtils"),
         FileUtils           = brackets.getModule("file/FileUtils"),
         Menus               = brackets.getModule("command/Menus"),
-        NativeFileSystem    = brackets.getModule("file/NativeFileSystem").NativeFileSystem,
         Directory           = brackets.getModule("filesystem/Directory"),
         FileSystem          = brackets.getModule("filesystem/FileSystem"),
         LanguageManager     = brackets.getModule("language/LanguageManager"),
@@ -49,8 +48,8 @@ define(function (require, exports, module) {
         MyStatusBar         = require("MyStatusBar");
 
     var moduledir           = FileUtils.getNativeModuleDirectoryPath(module),
-        templateEntry       = FileSystem.getFileForPath(moduledir + '/templates/jasmineNodeReportTemplate.html'),
-        reportJasNodeEntry  = FileSystem.getFileForPath(moduledir + '/node/reports/jasmineReport.html'),
+        templateFile       = FileSystem.getFileForPath(moduledir + '/templates/jasmineNodeReportTemplate.html'),
+        reportJasNodeFile  = FileSystem.getFileForPath(moduledir + '/node/reports/jasmineReport.html'),
         COMMAND_ID          = "BracketsXUnit.BracketsXUnit",
         commands            = [],
         YUITEST_CMD         = "yuitest_cmd",
@@ -90,10 +89,10 @@ define(function (require, exports, module) {
     /* finds the brackets-xunit: includes= strings contained in a test
      * parameters: contents dir
      *    contents = string of the entire test
-     *    dir = the base directory
+     *    dirPath = the base directory
      * returns: string of <script src="dir+path"/>
      */
-    function parseIncludes(contents, dir, cache) {
+    function parseIncludes(contents, dirPath, cache) {
         var includes = '';
         if (contents && contents.match(/brackets-xunit:\s*includes=/)) {
             var includestr = contents.match(/brackets-xunit:\s*includes=[A-Za-z0-9,\._\-\/\*]*/)[0];
@@ -110,7 +109,7 @@ define(function (require, exports, module) {
                     codeCoverage = ' data-cover';
                     //cacheBuster = '';
                 }
-                includes = includes + '<script src="' + dir + includeFile + cacheBuster + '"' + codeCoverage + '></script>\n';
+                includes = includes + '<script src="' + dirPath + includeFile + cacheBuster + '"' + codeCoverage + '></script>\n';
             }
         }
         return includes;
@@ -133,14 +132,14 @@ define(function (require, exports, module) {
         if (entry === undefined) {
             entry = DocumentManager.getCurrentDocument().file;
         }
-        var dir = entry.fullPath.substring(0, entry.fullPath.lastIndexOf('/') + 1),
-            dirEntry = FileSystem.getDirectoryForPath(dir),
+        var dirPath = entry.fullPath.substring(0, entry.fullPath.lastIndexOf('/') + 1),
+            dir = FileSystem.getDirectoryForPath(dirPath),
             fname = DocumentManager.getCurrentDocument().filename,
             contents = DocumentManager.getCurrentDocument().getText(),
             testName = entry.fullPath.substring(entry.fullPath.lastIndexOf("/") + 1),
             testBase = testName.substring(0, testName.lastIndexOf('.')),
-            yuiReportEntry = FileSystem.getFileForPath(dir + testBase + '/yuiReport.html'),
-            includes = parseIncludes(contents, dir),
+            yuiReportFile = FileSystem.getFileForPath(dirPath + testBase + '/yuiReport.html'),
+            includes = parseIncludes(contents, dirPath),
             data = { filename : entry.name,
                      title : 'YUI test - ' + entry.name,
                      templatedir : moduledir,
@@ -150,9 +149,9 @@ define(function (require, exports, module) {
         var template = require("text!templates/yui.html");
         var html = Mustache.render(template, data);
         var useCodeCoverage = true;
-        FileSystem.getDirectoryForPath(dir + testBase).create(function () {
-            FileUtils.writeText(yuiReportEntry, html).done(function () {
-                var urlToReport = yuiReportEntry.fullPath + (useCodeCoverage ? "?coverage=true" : "");
+        FileSystem.getDirectoryForPath(dirPath + testBase).create(function () {
+            FileUtils.writeText(yuiReportFile, html).done(function () {
+                var urlToReport = yuiReportFile.fullPath + (useCodeCoverage ? "?coverage=true" : "");
                 MyStatusBar.setReportWindow(urlToReport);
             });
         });
@@ -165,31 +164,31 @@ define(function (require, exports, module) {
         if (entry === undefined) {
             entry = DocumentManager.getCurrentDocument().file;
         }
-        var dir = entry.fullPath.substring(0, entry.fullPath.lastIndexOf('/') + 1),
-            dirEntry = FileSystem.getDirectoryForPath(dir),
+        var dirPath = entry.fullPath.substring(0, entry.fullPath.lastIndexOf('/') + 1),
+            dir = FileSystem.getDirectoryForPath(dirPath),
             testName = entry.fullPath.substring(entry.fullPath.lastIndexOf("/") + 1),
             testBase = testName.substring(0, testName.lastIndexOf('.')),
             newTestName = testBase + (testFileIndex++) + ".js",
             contents = DocumentManager.getCurrentDocument().getText(),
-            includes = parseIncludes(contents, dir),
+            includes = parseIncludes(contents, dirPath),
             relpath = entry.fullPath.substring(ProjectManager.getInitialProjectPath().length - 1),
-            jasmineTestName = dir + testBase + '/' + newTestName,
-            jasmineTestEntry = FileSystem.getFileForPath(jasmineTestName),
-            jasmineHtmlName = dir + testBase + "/" + testBase + ".html",
-            jasmineHtmlEntry = FileSystem.getFileForPath(jasmineHtmlName),
+            jasmineTestName = dirPath + testBase + '/' + newTestName,
+            jasmineTestFile = FileSystem.getFileForPath(jasmineTestName),
+            jasmineHtmlName = dirPath + testBase + "/" + testBase + ".html",
+            jasmineHtmlFile = FileSystem.getFileForPath(jasmineHtmlName),
             jasmineCss = require("text!templates/jasmine.css"),
-            jasmineCssEntry = FileSystem.getFileForPath(dir + testBase + "/jasmine.css"),
+            jasmineCssFile = FileSystem.getFileForPath(dirPath + testBase + "/jasmine.css"),
             jasmineJs = require("text!templates/jasmine.js"),
-            jasmineJsEntry = FileSystem.getFileForPath(dir + testBase + "/jasmine.js"),
+            jasmineJsFile = FileSystem.getFileForPath(dirPath + testBase + "/jasmine.js"),
             jasmineJsReporter = require("text!templates/jasmineCompleteReporter.js"),
-            jasmineJsReporterEntry = FileSystem.getFileForPath(dir + testBase + "/jasmineCompleteReporter.js"),
+            jasmineJsReporterFile = FileSystem.getFileForPath(dirPath + testBase + "/jasmineCompleteReporter.js"),
             jasmineJsHtml = require("text!templates/jasmine-html.js"),
-            jasmineJsHtmlEntry = FileSystem.getFileForPath(dir + testBase + "/jasmine-html.js"),
+            jasmineJsHtmlFile = FileSystem.getFileForPath(dirPath + testBase + "/jasmine-html.js"),
             jasmineJsBlanket = require("text!templates/jasmine.blanket.js"),
-            jasmineJsBlanketEntry = FileSystem.getFileForPath(dir + testBase + "/jasmine.blanket.js"),
+            jasmineJsBlanketFile = FileSystem.getFileForPath(dirPath + testBase + "/jasmine.blanket.js"),
             requireSrc = require("text!node/node_modules/jasmine-node/node_modules/requirejs/require.js"),
-            requireSrcEntry = FileSystem.getFileForPath(dir + testBase + "/require.js");
-        var apiFile = contents.match(/require\('\.\/[A-Za-z0-9\-]+\.js/);
+            requireSrcFile = FileSystem.getFileForPath(dirPath + testBase + "/require.js");
+        var apiFilePath = contents.match(/require\('\.\/[A-Za-z0-9\-]+\.js/);
         
         
         
@@ -215,29 +214,29 @@ define(function (require, exports, module) {
             }
             
             $.when(
-                FileUtils.writeText(jasmineTestEntry, contents),
-                FileUtils.writeText(jasmineHtmlEntry, html),
-                FileUtils.writeText(jasmineCssEntry, jasmineCss),
-                FileUtils.writeText(jasmineJsEntry, jasmineJs),
-                FileUtils.writeText(jasmineJsReporterEntry, jasmineJsReporter),
-                FileUtils.writeText(requireSrcEntry, requireSrc),
-                FileUtils.writeText(jasmineJsBlanketEntry, jasmineJsBlanket),
-                FileUtils.writeText(jasmineJsHtmlEntry, jasmineJsHtml)
+                FileUtils.writeText(jasmineTestFile, contents),
+                FileUtils.writeText(jasmineHtmlFile, html),
+                FileUtils.writeText(jasmineCssFile, jasmineCss),
+                FileUtils.writeText(jasmineJsFile, jasmineJs),
+                FileUtils.writeText(jasmineJsReporterFile, jasmineJsReporter),
+                FileUtils.writeText(requireSrcFile, requireSrc),
+                FileUtils.writeText(jasmineJsBlanketFile, jasmineJsBlanket),
+                FileUtils.writeText(jasmineJsHtmlFile, jasmineJsHtml)
             ).done(function () {
-                if (apiFile) {
-                    var apiFileName = apiFile[0].substring(11),
-                        apiFileEntry = FileSystem.getFileForPath(dir + apiFileName),
-                        apiNewFileEntry = FileSystem.getFileForPath(dir + testBase + '/' + apiFileName);
-                    FileUtils.readAsText(apiFileEntry).done(function (text, modtime) {
-                        FileUtils.writeText(apiNewFileEntry, text).done(function () {
-                            var urlToReport = jasmineHtmlEntry.fullPath + (useCodeCoverage ? "?coverage=true" : "");
+                if (apiFilePath) {
+                    var apiFileName = apiFilePath[0].substring(11),
+                        apiFile = FileSystem.getFileForPath(dirPath + apiFileName),
+                        apiNewFile = FileSystem.getFileForPath(dirPath + testBase + '/' + apiFileName);
+                    FileUtils.readAsText(apiFile).done(function (text, modtime) {
+                        FileUtils.writeText(apiNewFile, text).done(function () {
+                            var urlToReport = jasmineHtmlFile.fullPath + (useCodeCoverage ? "?coverage=true" : "");
                             MyStatusBar.setReportWindow(urlToReport);
                             
                            
                         });
                     });
                 } else {
-                    var urlToReport = jasmineHtmlEntry.fullPath + (useCodeCoverage ? "?coverage=true" : "");
+                    var urlToReport = jasmineHtmlFile.fullPath + (useCodeCoverage ? "?coverage=true" : "");
                     MyStatusBar.setReportWindow(urlToReport);
                    
                 }
@@ -270,15 +269,15 @@ define(function (require, exports, module) {
         if (entry === undefined) {
             entry = DocumentManager.getCurrentDocument().file;
         }
-        var dir = entry.fullPath.substring(0, entry.fullPath.lastIndexOf('/') + 1),
-            dirEntry = FileSystem.getDirectoryForPath(dir),
+        var dirPath = entry.fullPath.substring(0, entry.fullPath.lastIndexOf('/') + 1),
+            dir = FileSystem.getDirectoryForPath(dirPath),
             fname = DocumentManager.getCurrentDocument().filename,
             contents = DocumentManager.getCurrentDocument().getText(),
             testName = entry.fullPath.substring(entry.fullPath.lastIndexOf("/") + 1),
             testBase = testName.substring(0, testName.lastIndexOf('.')),
-            qunitReportEntry = FileSystem.getFileForPath(dir + testBase + '/qUnitReport.html'),
+            qunitReportFile = FileSystem.getFileForPath(dirPath + testBase + '/qUnitReport.html'),
             useCodeCoverage = true,
-            includes = parseIncludes(contents, dir, new Date().getTime());
+            includes = parseIncludes(contents, dirPath, new Date().getTime());
         var data = { filename : entry.name,
                      title : 'QUnit test - ' + entry.name,
                      includes : includes + "<script src='qunit.js'></script>",
@@ -290,16 +289,16 @@ define(function (require, exports, module) {
         var html = Mustache.render(template, data),
         // write generated test report to file on disk
             qunitJs = require("text!thirdparty/test/qunit.js"),
-            qunitJsEntry = FileSystem.getFileForPath(dir + testBase + "/qunit.js"),
+            qunitJsFile = FileSystem.getFileForPath(dirPath + testBase + "/qunit.js"),
             qunitJsBlanket = require("text!templates/qunit.blanket.js"),
-            qunitJsBlanketEntry = FileSystem.getFileForPath(dir + testBase + "/qunit.blanket.js");
-        FileSystem.getDirectoryForPath(dir + testBase).create(function () {
+            qunitJsBlanketFile = FileSystem.getFileForPath(dirPath + testBase + "/qunit.blanket.js");
+        FileSystem.getDirectoryForPath(dirPath + testBase).create(function () {
             $.when(
-                FileUtils.writeText(qunitJsEntry, qunitJs),
-                FileUtils.writeText(qunitJsBlanketEntry, qunitJsBlanket),
-                FileUtils.writeText(qunitReportEntry, html)
+                FileUtils.writeText(qunitJsFile, qunitJs),
+                FileUtils.writeText(qunitJsBlanketFile, qunitJsBlanket),
+                FileUtils.writeText(qunitReportFile, html)
             ).done(function () {
-                var urlToReport = qunitReportEntry.fullPath + (useCodeCoverage ? "?coverage=true" : "");
+                var urlToReport = qunitReportFile.fullPath + (useCodeCoverage ? "?coverage=true" : "");
                 MyStatusBar.setReportWindow(urlToReport);
             });
             
@@ -376,10 +375,10 @@ define(function (require, exports, module) {
     // createNewFile: for generated tests created a new file in brackets
     // the file is added to the project (left panel)
     function createNewFile(fullpath, contents, testExt) {
-        function _getUntitledFileSuggestion(dir, baseFileName, fileExt, isFolder) {
+        function _getUntitledFileSuggestion(dirPath, baseFileName, fileExt, isFolder) {
             var result = new $.Deferred();
             var suggestedName = baseFileName + fileExt;
-            var dirEntry = FileSystem.getDirectoryForPath(dir);
+            var dir = FileSystem.getDirectoryForPath(dirPath);
 
             result.progress(function attemptNewName(suggestedName, nextIndexToUse) {
                 if (nextIndexToUse > 99) {
@@ -388,29 +387,28 @@ define(function (require, exports, module) {
                     return;
                 }
 
+                
+                
                 //check this name
-                var successCallback = function (entry) {
-                    //file exists, notify to the next progress
-                    result.notify(baseFileName + "-" + nextIndexToUse + fileExt, nextIndexToUse + 1);
-                };
-                var errorCallback = function (error) {
-                    //most likely error is FNF, user is better equiped to handle the rest
-                    result.resolve(suggestedName);
+                var callback = function (error, entry) {
+                    if (error) {
+                        //most likely error is FNF, user is better equiped to handle the rest
+                        result.resolve(suggestedName);
+                    } else {
+                        //file exists, notify to the next progress
+                        result.notify(baseFileName + "-" + nextIndexToUse + fileExt, nextIndexToUse + 1);
+                    }
                 };
             
                 if (isFolder) {
-                    dirEntry.getDirectory(
+                    FileSystem.resolve(
                         suggestedName,
-                        {},
-                        successCallback,
-                        errorCallback
+                        callback
                     );
                 } else {
-                    dirEntry.getFile(
+                    FileSystem.resolve(
                         suggestedName,
-                        {},
-                        successCallback,
-                        errorCallback
+                        callback
                     );
                 }
             });
@@ -682,8 +680,8 @@ define(function (require, exports, module) {
     function readConfig() {
         var result = new $.Deferred();
         var root = ProjectManager.getProjectRoot(),
-            configEntry = FileSystem.getFileForPath(root.fullPath + "config.js");
-        FileUtils.readAsText(configEntry).done(function (text, timestamp) {
+            configFile = FileSystem.getFileForPath(root.fullPath + "config.js");
+        FileUtils.readAsText(configFile).done(function (text, timestamp) {
             try {
                 var config = JSON.parse(text);
                 if (config.hasOwnProperty('brackets-xunit') && config['brackets-xunit'] === 'disable') {
@@ -868,7 +866,7 @@ define(function (require, exports, module) {
                     jsondata.substring(7)
                 );
             } else {
-                FileUtils.readAsText(templateEntry).done(function (text, timestamp) {
+                FileUtils.readAsText(templateFile).done(function (text, timestamp) {
 
                     jsondata = jsondata.replace(/'/g, "");
                     
@@ -879,8 +877,8 @@ define(function (require, exports, module) {
                         totaltime = totaltime + parseFloat(jdata[i].time);
                     }
                     var html = Mustache.render(text, {jsondata: jsondata, time: totaltime});
-                    FileUtils.writeText(reportJasNodeEntry, html).done(function () {
-                        window.open(reportJasNodeEntry.fullPath);
+                    FileUtils.writeText(reportJasNodeFile, html).done(function () {
+                        window.open(reportJasNodeFile.fullPath);
                     });
                 });
             }

@@ -192,7 +192,7 @@ define(function (require, exports, module) {
         
         
         
-        FileSystem.getDirectoryForPath(testBase).create(function () {
+        FileSystem.getDirectoryForPath(dirPath + testBase).create(function () {
             var useCodeCoverage = true,
                 data = {
                     filename : entry.name,

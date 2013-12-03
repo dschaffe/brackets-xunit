@@ -1,7 +1,7 @@
 {
     "name": "brackets-xunit",
     "title": "xUnit & Blanket",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "description": "Open a quint, YUI or Jasmine file to run tests",
     "homepage": "http://brackets-xunit.github.io",
     "author": "Dan Schaffer (https://github.com/dschaffe) & digiguru (https://github.com/digiguru)",
@@ -30,6 +30,6 @@
         "templates/yui.html"
     ],
     "engines": {
-        "brackets": ">=0.22.0"
+        "brackets": ">=0.34.0"
     }
 }

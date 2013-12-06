@@ -49,11 +49,19 @@ define(function (require, exports, module) {
                 //Should make a "Copy files"?
                 var dfd = new $.Deferred(),
                     me = this,
-                    writeFile = FileSystem.getFileForPath(directory + "/" + me.getFileName(readPath));
-                $.when(this.getFileContents(readPath)).then(function(text) {
-                    $.when(FileUtils.writeText(writeFile, text)).then(dfd.resolve(text));
-                });  
+                    writeFile = FileSystem.getFileForPath(directory + "/" + me.getFileName(readPath)),
+                    contents;
+                
+                me.getFileContents(readPath)
+                    .pipe(function(text) {
+                        contents = text;
+                        return FileUtils.writeText(writeFile, contents);
+                    }).done(function() {
+                        dfd.resolve(contents);
+                    });
+                
                 return dfd.promise();
+        
             },
             saveText: function (inputText, writePath) {
                 var writeFile = FileSystem.getFileForPath(writePath);
@@ -70,9 +78,7 @@ define(function (require, exports, module) {
                 };
             },
             createDirectory: function (path) {
-                var dfd = new $.Deferred();
-                FileSystem.getDirectoryForPath(path).create(dfd.resolve, dfd.fail);
-                return dfd.promise();
+                return FileSystem.getDirectoryForPath(path);
             },
             parseIncludes : function (contents, dirPath, cache) {
                 var includes = '';
@@ -116,21 +122,19 @@ define(function (require, exports, module) {
             
             $.when(
                 FileProxy.createDirectory(fileInfo.testPath)
-            ).done(function () {
-                $.when(
-                    FileProxy.getFileContents("text!templates/qunit/qunit.html", fileInfo.testPath),
-                    FileProxy.copyFile("text!templates/qunit/qunit.js", fileInfo.testPath),
-                    FileProxy.copyFile("text!templates/qunit/qunit.blanket.js", fileInfo.testPath)
-                ).done(function(htmlTemplate, qunit, blanket) { // You can get params for each file (the contents at least)
-                    console.log(htmlTemplate.length, qunit.length, blanket.length);
-                    var html = Mustache.render(htmlTemplate, data);
-                    $.when(
-                        FileProxy.saveText(html, outputFile.fullPath)
-                    ).done(function () {
-                        var urlToReport = outputFile.fullPath + (useCodeCoverage ? "?coverage=true" : "");
-                        MyStatusBar.setReportWindow(urlToReport);
-                    });
-                });
+            ).pipe(function () {
+                return $.when(
+                        FileProxy.getFileContents("text!templates/qunit/qunit.html", fileInfo.testPath),
+                        FileProxy.copyFile("text!templates/qunit/qunit.js", fileInfo.testPath),
+                        FileProxy.copyFile("text!templates/qunit/qunit.blanket.js", fileInfo.testPath)
+                    ).promise();
+            }).pipe(function(htmlTemplate, qunit, blanket) { // You can get params for each file (the contents at least)
+                console.log("Text lengths: ", htmlTemplate.length, qunit.length, blanket.length);
+                var html = Mustache.render(htmlTemplate, data);
+                return FileProxy.saveText(html, outputFile.fullPath);
+            }).done(function () {
+                var urlToReport = outputFile.fullPath + (useCodeCoverage ? "?coverage=true" : "");
+                MyStatusBar.setReportWindow(urlToReport);
             });
         };
     exports.run = run;

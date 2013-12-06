@@ -1,10 +1,15 @@
 {
     "name": "brackets-xunit",
     "title": "xUnit & Blanket",
-    "version": "0.3.0",
-    "description": "Open a quint, YUI or Jasmine file to run tests",
+    "version": "0.3.3",
+    "description": "Open a qUnit, YUI or Jasmine file to run tests",
     "homepage": "http://brackets-xunit.github.io",
-    "author": "Dan Schaffer (https://github.com/dschaffe) & digiguru (https://github.com/digiguru)",
+    "author": "brackets-xunit (https://github.com/brackets-xunit)",
+    "contributors" : 
+    [
+        "Dan Schaffer (https://github.com/dschaffer)",
+        "digiguru (https://github.com/digiguru)"
+    ],
     "categories":"testing",
     "keywords": [
         "test",

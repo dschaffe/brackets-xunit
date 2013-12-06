@@ -45,11 +45,12 @@ define(function (require, exports, module) {
         //PanelManager        = brackets.getModule("view/PanelManager"),
         //Resizer             = brackets.getModule("utils/Resizer"),
         //StatusBar           = brackets.getModule("widgets/StatusBar"),
+        qunitRunner         = require("main_qunit"),
         MyStatusBar         = require("MyStatusBar");
 
     var moduledir           = FileUtils.getNativeModuleDirectoryPath(module),
-        templateFile       = FileSystem.getFileForPath(moduledir + '/templates/jasmineNodeReportTemplate.html'),
-        reportJasNodeFile  = FileSystem.getFileForPath(moduledir + '/node/reports/jasmineReport.html'),
+        templateFile        = FileSystem.getFileForPath(moduledir + '/templates/jasmineNodeReportTemplate.html'),
+        reportJasNodeFile   = FileSystem.getFileForPath(moduledir + '/node/reports/jasmineReport.html'),
         COMMAND_ID          = "BracketsXUnit.BracketsXUnit",
         commands            = [],
         YUITEST_CMD         = "yuitest_cmd",
@@ -265,6 +266,11 @@ define(function (require, exports, module) {
 
     // Runs a QUnit test
     function runQUnit() {
+        qunitRunner.run();
+    }
+/*
+    // Runs a QUnit test
+    function runQUnit() {
         var entry = ProjectManager.getSelectedItem();
         if (entry === undefined) {
             entry = DocumentManager.getCurrentDocument().file;
@@ -304,6 +310,7 @@ define(function (require, exports, module) {
             
         });
     }
+*/
     // opens an html file in a new window
     function viewHtml() {
         var entry = ProjectManager.getSelectedItem();

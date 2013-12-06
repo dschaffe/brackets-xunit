@@ -78,7 +78,9 @@ define(function (require, exports, module) {
                 };
             },
             createDirectory: function (path) {
-                return FileSystem.getDirectoryForPath(path);
+                var dfd = new $.Deferred();
+                FileSystem.getDirectoryForPath(path).create(dfd.resolve, dfd.fail);
+                return dfd.promise();
             },
             parseIncludes : function (contents, dirPath, cache) {
                 var includes = '';
@@ -122,13 +124,14 @@ define(function (require, exports, module) {
             
             $.when(
                 FileProxy.createDirectory(fileInfo.testPath)
-            ).pipe(function () {
+            ).then(function (a,b,c) {
+                console.log("Created", a,b,c);
                 return $.when(
                         FileProxy.getFileContents("text!templates/qunit/qunit.html", fileInfo.testPath),
                         FileProxy.copyFile("text!templates/qunit/qunit.js", fileInfo.testPath),
                         FileProxy.copyFile("text!templates/qunit/qunit.blanket.js", fileInfo.testPath)
                     ).promise();
-            }).pipe(function(htmlTemplate, qunit, blanket) { // You can get params for each file (the contents at least)
+            }).then(function(htmlTemplate, qunit, blanket) { // You can get params for each file (the contents at least)
                 console.log("Text lengths: ", htmlTemplate.length, qunit.length, blanket.length);
                 var html = Mustache.render(htmlTemplate, data);
                 return FileProxy.saveText(html, outputFile.fullPath);

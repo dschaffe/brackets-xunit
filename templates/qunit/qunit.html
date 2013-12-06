@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>QUnit Test Results for: {{filename}}</title>
+<link rel="stylesheet" href="http://code.jquery.com/qunit/qunit-1.11.0.css">
+{{{includes}}}
+</head>
+<body>
+<div id="qunit"></div>
+<div id="qunit-fixture"></div>
+{{{coverage}}}
+<script>
+    var myParent = window.parent,
+        myFailures = 0;
+    
+    QUnit.done(function (obj) {
+        var result = {};
+        if (obj.failed) {
+            result.status = "failed";
+            result.message = myFailures + " failures";
+        } else {
+            result.status = "passed";
+            result.message = "Success! " + obj.passed + " passed";
+        }
+        if(myParent.reportComplete) {
+            myParent.reportComplete(result);
+        }
+        var totals = document.querySelectorAll(".grand-total .rs");
+        if(myParent.coverageComplete) {
+            myParent.coverageComplete({
+                message: totals && totals[0] ? totals[0].innerHTML + " coverage" : "No coverage"
+            });
+        }
+    });
+    QUnit.testDone(function (obj) {
+        var msg = "Running",
+            result = {};
+        if (obj.failed) {
+            myFailures++;
+            msg += " with " + myFailures + " failures";
+        }
+        result.message = msg;
+        if(myParent.reportUpdate) {
+            myParent.reportUpdate(result);
+        }
+       
+    }); 
+
+    
+    {{{contents}}}
+</script>
+</body>
+</html>

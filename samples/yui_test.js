@@ -13,6 +13,9 @@ YUI({ logInclude: {TestRunner: true }}).use('test', 'test-console', function (Y)
         },
         testAge: function () {
             Y.Assert.areEqual(28, this.data.age, "Age should be 28");
+        },
+        testAgeWrongly: function () {
+            Y.Assert.areEqual(27, this.data.age, "Age should be not 27");
         }
     });
     

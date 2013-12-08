@@ -46,7 +46,8 @@ define(function (require, exports, module) {
         //Resizer             = brackets.getModule("utils/Resizer"),
         //StatusBar           = brackets.getModule("widgets/StatusBar"),
         qunitRunner         = require("main_qunit"),
-        jasmineRunner         = require("main_jasmine"),
+        jasmineRunner       = require("main_jasmine"),
+        yuiRunner           = require("main_yui"),
         MyStatusBar         = require("MyStatusBar");
 
     var moduledir           = FileUtils.getNativeModuleDirectoryPath(module),
@@ -130,33 +131,7 @@ define(function (require, exports, module) {
     }
     // Execute YUI test
     function runYUI() {
-        var entry = ProjectManager.getSelectedItem();
-        if (entry === undefined) {
-            entry = DocumentManager.getCurrentDocument().file;
-        }
-        var dirPath = entry.fullPath.substring(0, entry.fullPath.lastIndexOf('/') + 1),
-            dir = FileSystem.getDirectoryForPath(dirPath),
-            fname = DocumentManager.getCurrentDocument().filename,
-            contents = DocumentManager.getCurrentDocument().getText(),
-            testName = entry.fullPath.substring(entry.fullPath.lastIndexOf("/") + 1),
-            testBase = testName.substring(0, testName.lastIndexOf('.')),
-            yuiReportFile = FileSystem.getFileForPath(dirPath + testBase + '/yuiReport.html'),
-            includes = parseIncludes(contents, dirPath),
-            data = { filename : entry.name,
-                     title : 'YUI test - ' + entry.name,
-                     templatedir : moduledir,
-                     includes : includes,
-                     contents : contents
-                   };
-        var template = require("text!templates/yui.html");
-        var html = Mustache.render(template, data);
-        var useCodeCoverage = true;
-        FileSystem.getDirectoryForPath(dirPath + testBase).create(function () {
-            FileUtils.writeText(yuiReportFile, html).done(function () {
-                var urlToReport = yuiReportFile.fullPath + (useCodeCoverage ? "?coverage=true" : "");
-                MyStatusBar.setReportWindow(urlToReport);
-            });
-        });
+        yuiRunner.run();
     }
  
     // Execute Jasmine test

@@ -1,7 +1,7 @@
 {
     "name": "brackets-xunit",
     "title": "xUnit & Blanket",
-    "version": "0.3.4",
+    "version": "0.3.5",
     "description": "Open a qUnit, YUI or Jasmine file to run tests",
     "homepage": "http://brackets-xunit.github.io",
     "author": "brackets-xunit (https://github.com/brackets-xunit)",

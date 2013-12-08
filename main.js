@@ -268,49 +268,7 @@ define(function (require, exports, module) {
     function runQUnit() {
         qunitRunner.run();
     }
-/*
-    // Runs a QUnit test
-    function runQUnit() {
-        var entry = ProjectManager.getSelectedItem();
-        if (entry === undefined) {
-            entry = DocumentManager.getCurrentDocument().file;
-        }
-        var dirPath = entry.fullPath.substring(0, entry.fullPath.lastIndexOf('/') + 1),
-            dir = FileSystem.getDirectoryForPath(dirPath),
-            fname = DocumentManager.getCurrentDocument().filename,
-            contents = DocumentManager.getCurrentDocument().getText(),
-            testName = entry.fullPath.substring(entry.fullPath.lastIndexOf("/") + 1),
-            testBase = testName.substring(0, testName.lastIndexOf('.')),
-            qunitReportFile = FileSystem.getFileForPath(dirPath + testBase + '/qUnitReport.html'),
-            useCodeCoverage = true,
-            includes = parseIncludes(contents, dirPath, new Date().getTime());
-        var data = { filename : entry.name,
-                     title : 'QUnit test - ' + entry.name,
-                     includes : includes + "<script src='qunit.js'></script>",
-                     templatedir : moduledir,
-                     contents : contents,
-                     coverage: (useCodeCoverage ? "<script src='qunit.blanket.js'></script>" : "")
-                   };
-        var template = require("text!templates/qunit.html");
-        var html = Mustache.render(template, data),
-        // write generated test report to file on disk
-            qunitJs = require("text!thirdparty/test/qunit.js"),
-            qunitJsFile = FileSystem.getFileForPath(dirPath + testBase + "/qunit.js"),
-            qunitJsBlanket = require("text!templates/qunit.blanket.js"),
-            qunitJsBlanketFile = FileSystem.getFileForPath(dirPath + testBase + "/qunit.blanket.js");
-        FileSystem.getDirectoryForPath(dirPath + testBase).create(function () {
-            $.when(
-                FileUtils.writeText(qunitJsFile, qunitJs),
-                FileUtils.writeText(qunitJsBlanketFile, qunitJsBlanket),
-                FileUtils.writeText(qunitReportFile, html)
-            ).done(function () {
-                var urlToReport = qunitReportFile.fullPath + (useCodeCoverage ? "?coverage=true" : "");
-                MyStatusBar.setReportWindow(urlToReport);
-            });
-            
-        });
-    }
-*/
+    
     // opens an html file in a new window
     function viewHtml() {
         var entry = ProjectManager.getSelectedItem();

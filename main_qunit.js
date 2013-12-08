@@ -23,94 +23,23 @@
  */
 
 /*jslint vars: true, plusplus: true, devel: true, nomen: true, indent: 4, maxerr: 50 */
-/*global brackets, define, $, Mustache */
+/*global brackets, define, $ */
 define(function (require, exports, module) {
     'use strict';
     
     var ProjectManager      = brackets.getModule("project/ProjectManager"),
         DocumentManager     = brackets.getModule("document/DocumentManager"),
-        FileSystem          = brackets.getModule("filesystem/FileSystem"),
+        //FileSystem          = brackets.getModule("filesystem/FileSystem"),
         FileUtils           = brackets.getModule("file/FileUtils"),
         moduledir           = FileUtils.getNativeModuleDirectoryPath(module),
         MyStatusBar         = require("MyStatusBar"),
-        FileProxy = {
-            getFileName: function (path) {
-                var startIndex = path.lastIndexOf("/") || path.lastIndexOf("!") || 0;
-                return path.substring(startIndex + 1);
-            },
-            getFileContents: function (readPath) {
-                var dfd = new $.Deferred();
-                require([readPath], function (text) {
-                    dfd.resolve(text);
-                });  
-                return dfd.promise();
-            },
-            copyFile: function (readPath, directory) {
-                //Should make a "Copy files"?
-                var dfd = new $.Deferred(),
-                    me = this,
-                    writeFile = FileSystem.getFileForPath(directory + "/" + me.getFileName(readPath)),
-                    contents;
-                
-                me.getFileContents(readPath)
-                    .pipe(function(text) {
-                        contents = text;
-                        return FileUtils.writeText(writeFile, contents);
-                    }).done(function() {
-                        dfd.resolve(contents);
-                    });
-                
-                return dfd.promise();
-        
-            },
-            saveText: function (inputText, writePath) {
-                var writeFile = FileSystem.getFileForPath(writePath);
-                return FileUtils.writeText(writeFile, inputText);
-            },
-            getTestFileInfo: function (entry, contents) {
-                var fileName = this.getFileName(entry.fullPath),
-                    fileNameNoExt = fileName.substring(0, fileName.lastIndexOf('.')),
-                    dirPath = entry.fullPath.substring(0, entry.fullPath.lastIndexOf('/') + 1);
-                return {
-                    originalPath: dirPath,
-                    testPath: dirPath + fileNameNoExt,
-                    contents: contents
-                };
-            },
-            createDirectory: function (path) {
-                var dfd = new $.Deferred();
-                FileSystem.getDirectoryForPath(path).create(dfd.resolve, dfd.fail);
-                return dfd.promise();
-            },
-            parseIncludes : function (contents, dirPath, cache) {
-                var includes = '';
-                if (contents && contents.match(/brackets-xunit:\s*includes=/)) {
-                    var includestr = contents.match(/brackets-xunit:\s*includes=[A-Za-z0-9,\._\-\/\*]*/)[0];
-                    includestr = includestr.substring(includestr.indexOf('=') + 1);
-                    
-                    var includedata = includestr.split(',');
-                    var i;
-                    for (i = 0; i < includedata.length; i++) {
-                        var includeFile = includedata[i],
-                            codeCoverage = '',
-                            cacheBuster = cache ? '?u=' + cache : '';
-                        if (includeFile[includeFile.length - 1] === "*") {
-                            includeFile = includeFile.substring(0, includeFile.length - 1);
-                            codeCoverage = ' data-cover';
-                            //cacheBuster = '';
-                        }
-                        includes = includes + '<script src="' + dirPath + includeFile + cacheBuster + '"' + codeCoverage + '></script>\n';
-                    }
-                }
-                return includes;
-            }
-        },
+        FileProxy           = require("FileProxy"),
         run = function () {
+            
             var entry = ProjectManager.getSelectedItem() || DocumentManager.getCurrentDocument().file,
-                contents = DocumentManager.getCurrentDocument().getText(),
-                    //If .getText() is depricated we will have to read the file - entry.read(callback)
+                contents = //If .getText() is depricated we will have to read the file - entry.read(callback)
+                    DocumentManager.getCurrentDocument().getText(),
                 fileInfo = FileProxy.getTestFileInfo(entry, contents),
-                outputFile = FileSystem.getFileForPath(fileInfo.testPath + '/qUnitReport.html'),
                 includes = FileProxy.parseIncludes(fileInfo.contents, fileInfo.originalPath, new Date().getTime()),
                 useCodeCoverage = true,
                 data = {
@@ -124,21 +53,20 @@ define(function (require, exports, module) {
             
             $.when(
                 FileProxy.createDirectory(fileInfo.testPath)
-            ).then(function (a,b,c) {
-                console.log("Created", a,b,c);
+            ).then(function () {
+                
                 return $.when(
-                        FileProxy.getFileContents("text!templates/qunit/qunit.html", fileInfo.testPath),
-                        FileProxy.copyFile("text!templates/qunit/qunit.js", fileInfo.testPath),
-                        FileProxy.copyFile("text!templates/qunit/qunit.blanket.js", fileInfo.testPath)
-                    ).promise();
-            }).then(function(htmlTemplate, qunit, blanket) { // You can get params for each file (the contents at least)
-                console.log("Text lengths: ", htmlTemplate.length, qunit.length, blanket.length);
-                var html = Mustache.render(htmlTemplate, data);
-                return FileProxy.saveText(html, outputFile.fullPath);
+                FileProxy.copyFile("text!templates/qunit/qunit.html", fileInfo.testPath, data),
+                FileProxy.copyFile("text!templates/qunit/qunit.js", fileInfo.testPath),
+                FileProxy.copyFile("text!templates/qunit/qunit.blanket.js", fileInfo.testPath),
+                FileProxy.copyFile("text!templates/qunit/qunit.css", fileInfo.testPath)
+                ).promise();
+                
             }).done(function () {
-                var urlToReport = outputFile.fullPath + (useCodeCoverage ? "?coverage=true" : "");
+                var urlToReport = fileInfo.testPath + '/qunit.html' + (useCodeCoverage ? "?coverage=true" : "");
                 MyStatusBar.setReportWindow(urlToReport);
             });
+            
         };
     exports.run = run;
 });

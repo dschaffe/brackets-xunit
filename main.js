@@ -46,10 +46,11 @@ define(function (require, exports, module) {
         //Resizer             = brackets.getModule("utils/Resizer"),
         //StatusBar           = brackets.getModule("widgets/StatusBar"),
         qunitRunner         = require("main_qunit"),
+        jasmineRunner         = require("main_jasmine"),
         MyStatusBar         = require("MyStatusBar");
 
     var moduledir           = FileUtils.getNativeModuleDirectoryPath(module),
-        templateFile        = FileSystem.getFileForPath(moduledir + '/templates/jasmineNodeReportTemplate.html'),
+        templateFile        = FileSystem.getFileForPath(moduledir + '/templates/jasmine/jasmineNodeReportTemplate.html'),
         reportJasNodeFile   = FileSystem.getFileForPath(moduledir + '/node/reports/jasmineReport.html'),
         COMMAND_ID          = "BracketsXUnit.BracketsXUnit",
         commands            = [],
@@ -160,89 +161,8 @@ define(function (require, exports, module) {
  
     // Execute Jasmine test
     function runJasmine() {
-        console.log("runJasmine");
-        var entry = ProjectManager.getSelectedItem();
-        if (entry === undefined) {
-            entry = DocumentManager.getCurrentDocument().file;
-        }
-        var dirPath = entry.fullPath.substring(0, entry.fullPath.lastIndexOf('/') + 1),
-            dir = FileSystem.getDirectoryForPath(dirPath),
-            testName = entry.fullPath.substring(entry.fullPath.lastIndexOf("/") + 1),
-            testBase = testName.substring(0, testName.lastIndexOf('.')),
-            newTestName = testBase + (testFileIndex++) + ".js",
-            contents = DocumentManager.getCurrentDocument().getText(),
-            includes = parseIncludes(contents, dirPath),
-            relpath = entry.fullPath.substring(ProjectManager.getInitialProjectPath().length - 1),
-            jasmineTestName = dirPath + testBase + '/' + newTestName,
-            jasmineTestFile = FileSystem.getFileForPath(jasmineTestName),
-            jasmineHtmlName = dirPath + testBase + "/" + testBase + ".html",
-            jasmineHtmlFile = FileSystem.getFileForPath(jasmineHtmlName),
-            jasmineCss = require("text!templates/jasmine.css"),
-            jasmineCssFile = FileSystem.getFileForPath(dirPath + testBase + "/jasmine.css"),
-            jasmineJs = require("text!templates/jasmine.js"),
-            jasmineJsFile = FileSystem.getFileForPath(dirPath + testBase + "/jasmine.js"),
-            jasmineJsReporter = require("text!templates/jasmineCompleteReporter.js"),
-            jasmineJsReporterFile = FileSystem.getFileForPath(dirPath + testBase + "/jasmineCompleteReporter.js"),
-            jasmineJsHtml = require("text!templates/jasmine-html.js"),
-            jasmineJsHtmlFile = FileSystem.getFileForPath(dirPath + testBase + "/jasmine-html.js"),
-            jasmineJsBlanket = require("text!templates/jasmine.blanket.js"),
-            jasmineJsBlanketFile = FileSystem.getFileForPath(dirPath + testBase + "/jasmine.blanket.js"),
-            requireSrc = require("text!node/node_modules/jasmine-node/node_modules/requirejs/require.js"),
-            requireSrcFile = FileSystem.getFileForPath(dirPath + testBase + "/require.js");
-        var apiFilePath = contents.match(/require\('\.\/[A-Za-z0-9\-]+\.js/);
-        
-        
-        
-        FileSystem.getDirectoryForPath(dirPath + testBase).create(function () {
-            var useCodeCoverage = true,
-                data = {
-                    filename : entry.name,
-                    jasmineTest : newTestName,
-                    title : 'Jasmine test - ' + entry.name,
-                    includes : includes,
-                    contents : DocumentManager.getCurrentDocument().getText(),
-                    coverage : useCodeCoverage ? "<script src='jasmine.blanket.js'></script>" : ""
-                },
-                template,
-                html;
-            if (data.contents.match(/define\(/)) {
-                var filepath = { fullpath: entry.fullPath };
-                template = require("text!templates/jasmine_requirejs.html");
-                html = Mustache.render(template, data);
-            } else {
-                template = require("text!templates/jasmine.html");
-                html = Mustache.render(template, data);
-            }
-            
-            $.when(
-                FileUtils.writeText(jasmineTestFile, contents),
-                FileUtils.writeText(jasmineHtmlFile, html),
-                FileUtils.writeText(jasmineCssFile, jasmineCss),
-                FileUtils.writeText(jasmineJsFile, jasmineJs),
-                FileUtils.writeText(jasmineJsReporterFile, jasmineJsReporter),
-                FileUtils.writeText(requireSrcFile, requireSrc),
-                FileUtils.writeText(jasmineJsBlanketFile, jasmineJsBlanket),
-                FileUtils.writeText(jasmineJsHtmlFile, jasmineJsHtml)
-            ).done(function () {
-                if (apiFilePath) {
-                    var apiFileName = apiFilePath[0].substring(11),
-                        apiFile = FileSystem.getFileForPath(dirPath + apiFileName),
-                        apiNewFile = FileSystem.getFileForPath(dirPath + testBase + '/' + apiFileName);
-                    FileUtils.readAsText(apiFile).done(function (text, modtime) {
-                        FileUtils.writeText(apiNewFile, text).done(function () {
-                            var urlToReport = jasmineHtmlFile.fullPath + (useCodeCoverage ? "?coverage=true" : "");
-                            MyStatusBar.setReportWindow(urlToReport);
-                            
-                           
-                        });
-                    });
-                } else {
-                    var urlToReport = jasmineHtmlFile.fullPath + (useCodeCoverage ? "?coverage=true" : "");
-                    MyStatusBar.setReportWindow(urlToReport);
-                   
-                }
-            });
-        });
+        jasmineRunner.run();
+       
     }
     
     // Run jasmine-node test, call to node server

@@ -22,13 +22,13 @@ describe("The fourth suite", function () {
     });
 });
 
-/*
+
 describe("The fither suite", function () {
     it("3rd testcase", function () {
         expect(false).toBe(true);
     });
 });
-*/
+
 
 
 

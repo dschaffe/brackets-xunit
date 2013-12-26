@@ -31,10 +31,10 @@ define(function (require, exports, module) {
             ).then(function () {
                 
                 return $.when(
-                FileProxy.copyFile("text!templates/qunit/qunit.html", fileInfo.testPath, data),
-                FileProxy.copyFile("text!templates/qunit/qunit.js", fileInfo.testPath),
-                FileProxy.copyFile("text!templates/qunit/qunit.blanket.js", fileInfo.testPath),
-                FileProxy.copyFile("text!templates/qunit/qunit.css", fileInfo.testPath)
+                    FileProxy.copyFile("text!templates/qunit/qunit.html", fileInfo.testPath, data),
+                    FileProxy.copyFile("text!templates/qunit/qunit.js", fileInfo.testPath),
+                    FileProxy.copyFile("text!templates/qunit/qunit.blanket.js", fileInfo.testPath),
+                    FileProxy.copyFile("text!templates/qunit/qunit.css", fileInfo.testPath)
                 ).promise();
                 
             }).done(function () {

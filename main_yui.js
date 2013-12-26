@@ -17,7 +17,7 @@ define(function (require, exports, module) {
                 fileInfo = FileProxy.getTestFileInfo(entry, contents),
                 includes = FileProxy.parseIncludes(fileInfo.contents, fileInfo.originalPath, new Date().getTime()),
                 useCodeCoverage = true,
-                data = { 
+                data = {
                     filename : entry.name,
                     title : 'YUI test - ' + entry.name,
                     templatedir : moduledir,
@@ -30,8 +30,8 @@ define(function (require, exports, module) {
             ).then(function () {
                 return $.when(
                      
-                FileProxy.copyFile("text!templates/yui/yui.html", fileInfo.testPath, data),
-                FileProxy.copyFile("text!templates/yui/yui.js", fileInfo.testPath)
+                    FileProxy.copyFile("text!templates/yui/yui.html", fileInfo.testPath, data),
+                    FileProxy.copyFile("text!templates/yui/yui.js", fileInfo.testPath)
                      
                 ).promise();
             }).done(function () {

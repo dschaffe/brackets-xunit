@@ -23,7 +23,7 @@
  */
 
 /*jslint vars: true, plusplus: true, devel: true, nomen: true, indent: 4, maxerr: 50 */
-/*global brackets, define, $, window, Mustache, document, setInterval */
+/*global brackets, define, $, window, Mustache */
 define(function (require, exports, module) {
     'use strict';
     
@@ -33,18 +33,12 @@ define(function (require, exports, module) {
         ExtensionUtils      = brackets.getModule("utils/ExtensionUtils"),
         FileUtils           = brackets.getModule("file/FileUtils"),
         Menus               = brackets.getModule("command/Menus"),
-        Directory           = brackets.getModule("filesystem/Directory"),
         FileSystem          = brackets.getModule("filesystem/FileSystem"),
         LanguageManager     = brackets.getModule("language/LanguageManager"),
         
         NodeConnection      = brackets.getModule("utils/NodeConnection"),
         DocumentManager     = brackets.getModule("document/DocumentManager"),
-        EditorManager       = brackets.getModule("editor/EditorManager"),
         ProjectManager      = brackets.getModule("project/ProjectManager"),
-        FileViewController  = brackets.getModule("project/FileViewController"),
-        //PanelManager        = brackets.getModule("view/PanelManager"),
-        //Resizer             = brackets.getModule("utils/Resizer"),
-        //StatusBar           = brackets.getModule("widgets/StatusBar"),
         qunitRunner         = require("main_qunit"),
         jasmineRunner       = require("main_jasmine"),
         yuiRunner           = require("main_yui"),
@@ -53,7 +47,6 @@ define(function (require, exports, module) {
     var moduledir           = FileUtils.getNativeModuleDirectoryPath(module),
         templateFile        = FileSystem.getFileForPath(moduledir + '/templates/jasmine/jasmineNodeReportTemplate.html'),
         reportJasNodeFile   = FileSystem.getFileForPath(moduledir + '/node/reports/jasmineReport.html'),
-        COMMAND_ID          = "BracketsXUnit.BracketsXUnit",
         commands            = [],
         YUITEST_CMD         = "yuitest_cmd",
         JASMINETEST_CMD     = "jasminetest_cmd",
@@ -68,13 +61,7 @@ define(function (require, exports, module) {
         workingsetMenu      = Menus.getContextMenu(Menus.ContextMenuIds.WORKING_SET_MENU),
         nodeConnection      = new NodeConnection(),
         _windows            = {},
-        testFileIndex       = 0,
-        enableHtml          = false,
-        _collapsed          = false,
-        jsXunitTemplate     = require("text!templates/panel.html?u=1"),
-        $selectedRow,
-        _xunit_panel_visible;
-        
+        enableHtml          = false;
    
     
     /* display a modal dialog
@@ -151,7 +138,7 @@ define(function (require, exports, module) {
         nodeConnection.domains.jasmine.runTest(path)
             .fail(function (err) {
                 console.log("[brackets-jasmine] error running file: " + entry.fullPath + " message: " + err.toString());
-                var dlg = Dialogs.showModalDialog(
+                Dialogs.showModalDialog(
                     Dialogs.DIALOG_ID_ERROR,
                     "Jasmine Error",
                     "The test file contained an error: " + err.toString()
@@ -216,11 +203,10 @@ define(function (require, exports, module) {
     //          params is an array of strings containing parameter names
     function parseCurrentDocument() {
         var text = DocumentManager.getCurrentDocument().getText();
-        var filename = DocumentManager.getCurrentDocument().file.name;
         var acorn = require('thirdparty/acorn/acorn_loose');
         var walk = require('thirdparty/acorn/walk');
         var ast = acorn.parse_dammit(text);
-        var i, j, functions = [], fparams, fname, fparamstr;
+        var i, functions = [], fparams;
         walk.simple(ast, {
             FunctionDeclaration: function (node) {
                 fparams = [];
@@ -237,9 +223,6 @@ define(function (require, exports, module) {
     function createNewFile(fullpath, contents, testExt) {
         function _getUntitledFileSuggestion(dirPath, baseFileName, fileExt, isFolder) {
             var result = new $.Deferred();
-            var suggestedName = baseFileName + fileExt;
-            var dir = FileSystem.getDirectoryForPath(dirPath);
-
             result.progress(function attemptNewName(suggestedName, nextIndexToUse) {
                 if (nextIndexToUse > 99) {
                     //we've tried this enough
@@ -250,7 +233,7 @@ define(function (require, exports, module) {
                 
                 
                 //check this name
-                var callback = function (error, entry) {
+                var callback = function (error) {
                     if (error) {
                         //most likely error is FNF, user is better equiped to handle the rest
                         result.resolve(suggestedName);
@@ -323,7 +306,6 @@ define(function (require, exports, module) {
             filename = DocumentManager.getCurrentDocument().file.name,
             contents = DocumentManager.getCurrentDocument().getText(),
             userequire = contents.match(/define\w*\(/),
-            isnode = contents.match(/node\w*\:true/),
             i,
             j,
             fparamstr;
@@ -500,48 +482,12 @@ define(function (require, exports, module) {
     }
 
     
-        
-    /**
-     * Wait until the test condition is true or a timeout occurs. Useful for waiting
-     * on a server response or for a ui change (fadeIn, etc.) to occur.
-     *
-     * @param testFx javascript condition that evaluates to a boolean,
-     * it can be passed in as a string (e.g.: "1 == 1" or "$('#bar').is(':visible')" or
-     * as a callback function.
-     * @param onReady what to do when testFx condition is fulfilled,
-     * it can be passed in as a string (e.g.: "1 == 1" or "$('#bar').is(':visible')" or
-     * as a callback function.
-     * @param timeOutMillis the max amount of time to wait. If not specified, 3 sec is used.
-     
-    function waitFor(testFx, onReady, timeOutMillis) {
-        var maxtimeOutMillis = timeOutMillis || 30001, //< Default Max Timout is 3s
-            start = new Date().getTime(),
-            condition = false,
-            interval = setInterval(function () {
-                if ((new Date().getTime() - start < maxtimeOutMillis) && !condition) {
-                    // If not time-out yet and condition not yet fulfilled
-                    condition = (typeof (testFx) === "string" ? eval(testFx) : testFx()); //< defensive code
-                } else {
-                    if (!condition) {
-                        // If condition still not fulfilled (timeout but condition is 'false')
-                        console.log("'waitFor()' timeout");
-                        //phantom.exit(1);
-                    } else {
-                        // Condition fulfilled (timeout and/or condition is 'true')
-                        console.log("'waitFor()' finished in " + (new Date().getTime() - start) + "ms.");
-                        typeof (onReady) === "string" ? eval(onReady) : onReady(); //< Do what it's supposed to do once the condition is fulfilled
-                        clearInterval(interval); //< Stop this interval
-                    }
-                }
-            }, 100); //< repeat check every 250ms
-    }*/
-    
     // reads config.js to determine if brackets-xunit should be disabled for the current project     
     function readConfig() {
         var result = new $.Deferred();
         var root = ProjectManager.getProjectRoot(),
             configFile = FileSystem.getFileForPath(root.fullPath + "config.js");
-        FileUtils.readAsText(configFile).done(function (text, timestamp) {
+        FileUtils.readAsText(configFile).done(function (text) {
             try {
                 var config = JSON.parse(text);
                 if (config.hasOwnProperty('brackets-xunit') && config['brackets-xunit'] === 'disable') {
@@ -552,7 +498,7 @@ define(function (require, exports, module) {
             } finally {
                 return result.resolve('ok');
             }
-        }).fail(function (error) {
+        }).fail(function () {
             return result.resolve('ok');
         });
         return result.promise();
@@ -687,11 +633,7 @@ define(function (require, exports, module) {
             .on("documentSaved.xunit", function (e, d) {
                 runTestsOnSaveOrChange(d);
             });
-        /*$(DocumentManager)
-            .on("documentRefreshed.xunit", function(e, d) { 
-                runTestsOnSaveOrChange(d);
-            });*/
-        
+       
     
         $(DocumentManager)
             .on("currentDocumentChange", function () {
@@ -720,13 +662,13 @@ define(function (require, exports, module) {
 
         $(nodeConnection).on("jasmine.update", function (evt, jsondata) {
             if (jsondata.length > 5 && jsondata.substring(0, 6) === 'Error:') {
-                var dlg = Dialogs.showModalDialog(
+                Dialogs.showModalDialog(
                     Dialogs.DIALOG_ID_ERROR,
                     "Jasmine Node Error",
                     jsondata.substring(7)
                 );
             } else {
-                FileUtils.readAsText(templateFile).done(function (text, timestamp) {
+                FileUtils.readAsText(templateFile).done(function (text) {
 
                     jsondata = jsondata.replace(/'/g, "");
                     
@@ -753,49 +695,6 @@ define(function (require, exports, module) {
             return loadPromise;
         }
 
-        function processOutput(pid, data) {
-            var status = '';
-            if (_windows[pid].done === false) {
-                if (data.indexOf("=== Summary ===") > -1) {
-                    _windows[pid].done = true;
-                }
-                var passes = data.match(/passed/g);
-                if (passes === null) {
-                    passes = 0;
-                } else {
-                    passes = passes.length;
-                }
-                _windows[pid].passes += passes;
-                if (passes > 0) {
-                    status += '<span style="color:green">' + _windows[pid].passes + ' passes</span>, ';
-                } else {
-                    status += _windows[pid].passes + " passes, ";
-                }
-                var failures = data.match(/failed in (non-)?strict mode ===<br>/g);
-                if (failures === null) {
-                    failures = 0;
-                } else {
-                    failures = failures.length;
-                }
-                _windows[pid].fails += failures;
-                if (_windows[pid].fails === 0) {
-                    status += "0 failures";
-                } else {
-                    status += ' <span style="color:red">' + _windows[pid].fails + ' failures</span>';
-                }
-                var expectedfailures = data.match(/failed in (non-)?strict mode as expected<br>/g);
-                if (expectedfailures === null) {
-                    expectedfailures = 0;
-                } else {
-                    expectedfailures = expectedfailures.length;
-                }
-                _windows[pid].expfails += expectedfailures;
-                if (_windows[pid].expfails > 0) {
-                    status += ", " + _windows[pid].expfails + " expected failures";
-                }
-                _windows[pid].window.document.getElementById("status" + pid).innerHTML = status;
-            }
-        }
             
         $(nodeConnection).on("process.stdout", function (event, result) {
             var pid = result.pid,
@@ -806,7 +705,6 @@ define(function (require, exports, module) {
             } else {
                 var _window = _windows[pid].window,
                     _time = _windows[pid].startTime,
-                    _type = _windows[pid].type,
                     elapsed = new Date() - _time;
                 _window.document.getElementById("stdout-section").style.display = "block";
                 _window.document.getElementById("stdout").innerHTML += data;
@@ -823,7 +721,6 @@ define(function (require, exports, module) {
             } else {
                 var _window = _windows[pid].window,
                     _time = _windows[pid].startTime,
-                    _type = _windows[pid].type,
                     elapsed = new Date() - _time;
                 _window.document.getElementById("stderr-section").style.display = "block";
                 _window.document.getElementById("stderr").innerHTML += data;
@@ -868,7 +765,7 @@ define(function (require, exports, module) {
     CommandManager.register("xUnit View html", VIEWHTML_CMD, viewHtml);
 
     // check if the extension should add a menu item to the project menu (under the project name, left panel)
-    $(projectMenu).on("beforeContextMenuOpen", function (evt) {
+    $(projectMenu).on("beforeContextMenuOpen", function () {
         var selectedEntry = ProjectManager.getSelectedItem(),
             text = '';
         if (selectedEntry && selectedEntry.fullPath && DocumentManager.getCurrentDocument() !== null && selectedEntry.fullPath === DocumentManager.getCurrentDocument().file.fullPath) {
@@ -881,7 +778,7 @@ define(function (require, exports, module) {
     });
     
     // check if the extension should add a menu item to the workingset menu (under Working Files, left panel)
-    $(workingsetMenu).on("beforeContextMenuOpen", function (evt) {
+    $(workingsetMenu).on("beforeContextMenuOpen", function () {
         var selectedEntry = DocumentManager.getCurrentDocument().file,
             text = DocumentManager.getCurrentDocument().getText();
         cleanMenu(workingsetMenu);

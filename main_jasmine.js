@@ -25,9 +25,9 @@ define(function (require, exports) {
                     contents : DocumentManager.getCurrentDocument().getText(),
                     coverage : useCodeCoverage ? "<script src='jasmine.blanket.js'></script>" : ""
                 },
-                htmlFile = data.contents.match(/define\(/) ? 
-                    "jasmine_requirejs.html" :
-                    "jasmine.html",
+                htmlFile = data.contents.match(/define\(/) ?
+                        "jasmine_requirejs.html" :
+                        "jasmine.html",
                 apiFilePath = contents.match(/require\('\.\/[A-Za-z0-9\-]+\.js/);
             
             
@@ -36,7 +36,7 @@ define(function (require, exports) {
                 FileProxy.createDirectory(fileInfo.testPath)
             ).then(function () {
                 var dfd = new $.Deferred();
-                if(apiFilePath) {
+                if (apiFilePath) {
                     dfd.then(FileProxy.copyFile(fileInfo.originalPath + apiFilePath, fileInfo.testPath));
                 }
                 dfd.resolve();
@@ -44,14 +44,14 @@ define(function (require, exports) {
             }).then(function () {
                 return $.when(
                   
-                FileProxy.copyFile("text!templates/jasmine/" + htmlFile, fileInfo.testPath, data),
-                FileProxy.copyFile("text!templates/jasmine/jasmine.css", fileInfo.testPath),
-                FileProxy.copyFile("text!templates/jasmine/jquery.js", fileInfo.testPath),
-                FileProxy.copyFile("text!templates/jasmine/jasmine.js", fileInfo.testPath),
-                FileProxy.copyFile("text!templates/jasmine/jasmineCompleteReporter.js", fileInfo.testPath),
-                FileProxy.copyFile("text!templates/jasmine/jasmine-html.js", fileInfo.testPath),
-                FileProxy.copyFile("text!templates/jasmine/jasmine.blanket.js", fileInfo.testPath),
-                FileProxy.copyFile("text!node/node_modules/jasmine-node/node_modules/requirejs/require.js", fileInfo.testPath)
+                    FileProxy.copyFile("text!templates/jasmine/" + htmlFile, fileInfo.testPath, data),
+                    FileProxy.copyFile("text!templates/jasmine/jasmine.css", fileInfo.testPath),
+                    FileProxy.copyFile("text!templates/jasmine/jquery.js", fileInfo.testPath),
+                    FileProxy.copyFile("text!templates/jasmine/jasmine.js", fileInfo.testPath),
+                    FileProxy.copyFile("text!templates/jasmine/jasmineCompleteReporter.js", fileInfo.testPath),
+                    FileProxy.copyFile("text!templates/jasmine/jasmine-html.js", fileInfo.testPath),
+                    FileProxy.copyFile("text!templates/jasmine/jasmine.blanket.js", fileInfo.testPath),
+                    FileProxy.copyFile("text!node/node_modules/jasmine-node/node_modules/requirejs/require.js", fileInfo.testPath)
 
                 ).promise();
                 

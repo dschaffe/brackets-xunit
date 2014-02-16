@@ -2,7 +2,7 @@
 /*global brackets, define, $ */
 define(function (require, exports, module) {
     'use strict';
-    
+
     var ProjectManager      = brackets.getModule("project/ProjectManager"),
         DocumentManager     = brackets.getModule("document/DocumentManager"),
         FileUtils           = brackets.getModule("file/FileUtils"),
@@ -19,26 +19,23 @@ define(function (require, exports, module) {
                 useCodeCoverage = true,
                 data = {
                     filename : entry.name,
-                    title : 'QUnit test - ' + entry.name,
-                    includes : includes + "<script src='qunit.js'></script>",
+                    title : 'YUI test - ' + entry.name,
                     templatedir : moduledir,
-                    contents : fileInfo.contents,
-                    coverage: (useCodeCoverage ? "<script src='qunit.blanket.js'></script>" : "")
+                    includes : includes,
+                    contents : contents
                 };
             
             $.when(
                 FileProxy.createDirectory(fileInfo.testPath)
             ).then(function () {
-                
                 return $.when(
-                    FileProxy.copyFile("text!templates/qunit/qunit.html", fileInfo.testPath, data),
-                    FileProxy.copyFile("text!templates/qunit/qunit.js", fileInfo.testPath),
-                    FileProxy.copyFile("text!templates/qunit/qunit.blanket.js", fileInfo.testPath),
-                    FileProxy.copyFile("text!templates/qunit/qunit.css", fileInfo.testPath)
+                     
+                    FileProxy.copyFile("text!templates/yui/yui.html", fileInfo.testPath, data),
+                    FileProxy.copyFile("text!templates/yui/yui.js", fileInfo.testPath)
+                     
                 ).promise();
-                
             }).done(function () {
-                var urlToReport = fileInfo.testPath + '/qunit.html' + (useCodeCoverage ? "?coverage=true" : "");
+                var urlToReport = fileInfo.testPath + '/yui.html' + (useCodeCoverage ? "?coverage=true" : "");
                 MyStatusBar.setReportWindow(urlToReport);
             });
             

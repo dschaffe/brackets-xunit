@@ -23,49 +23,10 @@
  */
 
 /*jslint vars: true, plusplus: true, devel: true, nomen: true, indent: 4, maxerr: 50 */
-/*global brackets, define, $, window, Mustache, document, setInterval */
-define(function (require, exports, module) {
+/*global brackets, define, $, Mustache */
+define(function (require, exports) {
     'use strict';
     
-   /* var AppInit             = brackets.getModule("utils/AppInit"),
-        CommandManager      = brackets.getModule("command/CommandManager"),
-        Dialogs             = brackets.getModule("widgets/Dialogs"),
-        ExtensionUtils      = brackets.getModule("utils/ExtensionUtils"),
-        FileUtils           = brackets.getModule("file/FileUtils"),
-        Menus               = brackets.getModule("command/Menus"),
-        NativeFileSystem    = brackets.getModule("file/NativeFileSystem").NativeFileSystem,
-        LanguageManager     = brackets.getModule("language/LanguageManager"),
-        
-        NodeConnection      = brackets.getModule("utils/NodeConnection"),
-        DocumentManager     = brackets.getModule("document/DocumentManager"),
-        EditorManager       = brackets.getModule("editor/EditorManager"),
-        ProjectManager      = brackets.getModule("project/ProjectManager"),
-        FileViewController  = brackets.getModule("project/FileViewController"),
-        ;
-
-    var moduledir           = FileUtils.getNativeModuleDirectoryPath(module),
-        templateEntry       = new NativeFileSystem.FileEntry(moduledir + '/templates/jasmineNodeReportTemplate.html'),
-        reportJasNodeEntry  = new NativeFileSystem.FileEntry(moduledir + '/node/reports/jasmineReport.html'),
-        COMMAND_ID          = "BracketsXUnit.BracketsXUnit",
-        commands            = [],
-        YUITEST_CMD         = "yuitest_cmd",
-        JASMINETEST_CMD     = "jasminetest_cmd",
-        QUNITTEST_CMD       = "qunit_cmd",
-        SCRIPT_CMD          = "script_cmd",
-        NODETEST_CMD        = "nodetest_cmd",
-        GENERATE_JASMINE_CMD = "generate_jasmine_cmd",
-        GENERATE_QUNIT_CMD  = "generate_qunit_cmd",
-        GENERATE_YUI_CMD    = "generate_yui_cmd",
-        VIEWHTML_CMD        = "viewhtml_cmd",
-        projectMenu         = Menus.getContextMenu(Menus.ContextMenuIds.PROJECT_MENU),
-        workingsetMenu      = Menus.getContextMenu(Menus.ContextMenuIds.WORKING_SET_MENU),
-        nodeConnection      = new NodeConnection(),
-        _windows            = {},
-        testFileIndex       = 0,
-        enableHtml          = false,
-        $selectedRow,
-        _xunit_panel_visible;
-     */
     var _collapsed          = false,
         jsXunitTemplate     = require("text!templates/panel.html?u=1"),
         Resizer             = brackets.getModule("utils/Resizer"),
@@ -109,8 +70,8 @@ define(function (require, exports, module) {
     
     function initializePanel() {
         console.log("initializePanel");
-        var xunitHtml = Mustache.render(jsXunitTemplate, {});
-        var xunitPanel = PanelManager.createBottomPanel("xunit.results", $(xunitHtml), 100);
+        var xunitHtml = Mustache.render(jsXunitTemplate, {}),
+            xunitPanel = PanelManager.createBottomPanel("xunit.results", $(xunitHtml), 100);
         $xunitResults = $("#xunit-results");
         
         var xunitStatusHtml = $("<div id=\"xunit-status\" title=\"No xunit errors\">No tests</div>", {}),

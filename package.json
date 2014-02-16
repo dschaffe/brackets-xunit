@@ -1,7 +1,7 @@
 {
     "name": "brackets-xunit",
     "title": "xUnit & Blanket",
-    "version": "0.3.3",
+    "version": "0.3.5",
     "description": "Open a qUnit, YUI or Jasmine file to run tests",
     "homepage": "http://brackets-xunit.github.io",
     "author": "brackets-xunit (https://github.com/brackets-xunit)",
@@ -23,15 +23,15 @@
     "files": [
         "main.js",
         "package.json",
-        "templates/jasmine-html.js",
-        "templates/jasmine.blanket.js",
-        "templates/jasmine.css",
-        "templates/jasmine.js",
-        "templates/jasmine_requirejs.html",
-        "templates/jasmineNodeReportTemplates.html",
+        "templates/jasmine/jasmine-html.js",
+        "templates/jasmine/jasmine.blanket.js",
+        "templates/jasmine/jasmine.css",
+        "templates/jasmine/jasmine.js",
+        "templates/jasmine/jasmine_requirejs.html",
+        "templates/jasmine/jasmineNodeReportTemplates.html",
         "templates/process.html",
-        "templates/qunit.blanket.js",
-        "templates/qunit.html",
+        "templates/qunit/qunit.blanket.js",
+        "templates/qunit/qunit.html",
         "templates/yui.html"
     ],
     "engines": {

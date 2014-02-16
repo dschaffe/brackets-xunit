@@ -23,26 +23,30 @@
  */
 
 /*jslint vars: true, plusplus: true, devel: true, nomen: true, indent: 4, maxerr: 50 */
-/*global brackets, define, $, window, Mustache, document */
+/*global brackets, define, $, window, Mustache */
 define(function (require, exports, module) {
     'use strict';
-
+    
     var AppInit             = brackets.getModule("utils/AppInit"),
         CommandManager      = brackets.getModule("command/CommandManager"),
         Dialogs             = brackets.getModule("widgets/Dialogs"),
         ExtensionUtils      = brackets.getModule("utils/ExtensionUtils"),
         FileUtils           = brackets.getModule("file/FileUtils"),
         Menus               = brackets.getModule("command/Menus"),
-        NativeFileSystem    = brackets.getModule("file/NativeFileSystem").NativeFileSystem,
+        FileSystem          = brackets.getModule("filesystem/FileSystem"),
+        LanguageManager     = brackets.getModule("language/LanguageManager"),
+        
         NodeConnection      = brackets.getModule("utils/NodeConnection"),
         DocumentManager     = brackets.getModule("document/DocumentManager"),
         ProjectManager      = brackets.getModule("project/ProjectManager"),
-        FileViewController  = brackets.getModule("project/FileViewController");
+        qunitRunner         = require("main_qunit"),
+        jasmineRunner       = require("main_jasmine"),
+        yuiRunner           = require("main_yui"),
+        MyStatusBar         = require("MyStatusBar");
 
     var moduledir           = FileUtils.getNativeModuleDirectoryPath(module),
-        templateEntry       = new NativeFileSystem.FileEntry(moduledir + '/templates/jasmineNodeReportTemplate.html'),
-        reportJasNodeEntry  = new NativeFileSystem.FileEntry(moduledir + '/node/reports/jasmineReport.html'),
-        COMMAND_ID          = "BracketsXUnit.BracketsXUnit",
+        templateFile        = FileSystem.getFileForPath(moduledir + '/templates/jasmine/jasmineNodeReportTemplate.html'),
+        reportJasNodeFile   = FileSystem.getFileForPath(moduledir + '/node/reports/jasmineReport.html'),
         commands            = [],
         YUITEST_CMD         = "yuitest_cmd",
         JASMINETEST_CMD     = "jasminetest_cmd",
@@ -57,9 +61,9 @@ define(function (require, exports, module) {
         workingsetMenu      = Menus.getContextMenu(Menus.ContextMenuIds.WORKING_SET_MENU),
         nodeConnection      = new NodeConnection(),
         _windows            = {},
-        testFileIndex       = 0,
         enableHtml          = false;
-
+   
+    
     /* display a modal dialog
      * title: string  
      * message: string
@@ -75,18 +79,27 @@ define(function (require, exports, module) {
     /* finds the brackets-xunit: includes= strings contained in a test
      * parameters: contents dir
      *    contents = string of the entire test
-     *    dir = the base directory
+     *    dirPath = the base directory
      * returns: string of <script src="dir+path"/>
      */
-    function parseIncludes(contents, dir) {
+    function parseIncludes(contents, dirPath, cache) {
         var includes = '';
         if (contents && contents.match(/brackets-xunit:\s*includes=/)) {
-            var includestr = contents.match(/brackets-xunit:\s*includes=[A-Za-z0-9,\._\-\/]*/)[0];
+            var includestr = contents.match(/brackets-xunit:\s*includes=[A-Za-z0-9,\._\-\/\*]*/)[0];
             includestr = includestr.substring(includestr.indexOf('=') + 1);
+            
             var includedata = includestr.split(',');
             var i;
             for (i = 0; i < includedata.length; i++) {
-                includes = includes + '<script src="' + dir + includedata[i] + '"></script>\n';
+                var includeFile = includedata[i],
+                    codeCoverage = '',
+                    cacheBuster = cache ? '?u=' + cache : '';
+                if (includeFile[includeFile.length - 1] === "*") {
+                    includeFile = includeFile.substring(0, includeFile.length - 1);
+                    codeCoverage = ' data-cover';
+                    //cacheBuster = '';
+                }
+                includes = includes + '<script src="' + dirPath + includeFile + cacheBuster + '"' + codeCoverage + '></script>\n';
             }
         }
         return includes;
@@ -105,108 +118,13 @@ define(function (require, exports, module) {
     }
     // Execute YUI test
     function runYUI() {
-        var entry = ProjectManager.getSelectedItem();
-        if (entry === undefined) {
-            entry = DocumentManager.getCurrentDocument().file;
-        }
-        var dir = entry.fullPath.substring(0, entry.fullPath.lastIndexOf('/') + 1),
-            dirEntry = new NativeFileSystem.DirectoryEntry(dir),
-            fname = DocumentManager.getCurrentDocument().filename,
-            contents = DocumentManager.getCurrentDocument().getText(),
-            testName = entry.fullPath.substring(entry.fullPath.lastIndexOf("/") + 1),
-            testBase = testName.substring(0, testName.lastIndexOf('.')),
-            yuiReportEntry = new NativeFileSystem.FileEntry(dir + testBase + '/yuiReport.html'),
-            includes = parseIncludes(contents, dir),
-            data = { filename : entry.name,
-                     title : 'YUI test - ' + entry.name,
-                     templatedir : moduledir,
-                     includes : includes,
-                     contents : contents
-                   };
-        var template = require("text!templates/yui.html");
-        var html = Mustache.render(template, data);
-        dirEntry.getDirectory(dir + testBase, {create: true}, function () {
-            FileUtils.writeText(yuiReportEntry, html).done(function () {
-                var report = window.open(yuiReportEntry.fullPath);
-                report.focus();
-            });
-        });
+        yuiRunner.run();
     }
  
     // Execute Jasmine test
     function runJasmine() {
-        var entry = ProjectManager.getSelectedItem();
-        if (entry === undefined) {
-            entry = DocumentManager.getCurrentDocument().file;
-        }
-        var dir = entry.fullPath.substring(0, entry.fullPath.lastIndexOf('/') + 1),
-            dirEntry = new NativeFileSystem.DirectoryEntry(dir),
-            testName = entry.fullPath.substring(entry.fullPath.lastIndexOf("/") + 1),
-            testBase = testName.substring(0, testName.lastIndexOf('.')),
-            newTestName = testBase + (testFileIndex++) + ".js",
-            contents = DocumentManager.getCurrentDocument().getText(),
-            includes = parseIncludes(contents, dir),
-            relpath = entry.fullPath.substring(ProjectManager.getInitialProjectPath().length - 1),
-            jasmineTestName = dir + testBase + '/' + newTestName,
-            jasmineTestEntry = new NativeFileSystem.FileEntry(jasmineTestName),
-            jasmineHtmlName = dir + testBase + "/" + testBase + ".html",
-            jasmineHtmlEntry = new NativeFileSystem.FileEntry(jasmineHtmlName),
-            jasmineCss = require("text!templates/jasmine.css"),
-            jasmineCssEntry = new NativeFileSystem.FileEntry(dir + testBase + "/jasmine.css"),
-            jasmineJs = require("text!templates/jasmine.js"),
-            jasmineJsEntry = new NativeFileSystem.FileEntry(dir + testBase + "/jasmine.js"),
-            jasmineJsHtml = require("text!templates/jasmine-html.js"),
-            jasmineJsHtmlEntry = new NativeFileSystem.FileEntry(dir + testBase + "/jasmine-html.js"),
-            requireSrc = require("text!node/node_modules/jasmine-node/node_modules/requirejs/require.js"),
-            requireSrcEntry = new NativeFileSystem.FileEntry(dir + testBase + "/require.js");
-        var apiFile = contents.match(/require\('\.\/[A-Za-z0-9\-]+\.js/);
-        
-        
-        dirEntry.getDirectory(testBase, {create: true}, function () {
-            var data = {
-                    filename : entry.name,
-                    jasmineTest : newTestName,
-                    title : 'Jasmine test - ' + entry.name,
-                    includes : includes,
-                    contents : DocumentManager.getCurrentDocument().getText()
-                },
-                template,
-                html;
-            if (data.contents.match(/define\(/)) {
-                var filepath = { fullpath: entry.fullPath };
-                template = require("text!templates/jasmine_requirejs.html");
-                html = Mustache.render(template, data);
-            } else {
-                template = require("text!templates/jasmine.html");
-                html = Mustache.render(template, data);
-            }
-            FileUtils.writeText(jasmineTestEntry, contents).done(function () {
-                FileUtils.writeText(jasmineHtmlEntry, html).done(function () {
-                    FileUtils.writeText(jasmineCssEntry, jasmineCss).done(function () {
-                        FileUtils.writeText(jasmineJsEntry, jasmineJs).done(function () {
-                            FileUtils.writeText(requireSrcEntry, requireSrc).done(function () {
-                                FileUtils.writeText(jasmineJsHtmlEntry, jasmineJsHtml).done(function () {
-                                    if (apiFile) {
-                                        var apiFileName = apiFile[0].substring(11),
-                                            apiFileEntry = new NativeFileSystem.FileEntry(dir + apiFileName),
-                                            apiNewFileEntry = new NativeFileSystem.FileEntry(dir + testBase + '/' + apiFileName);
-                                        FileUtils.readAsText(apiFileEntry).done(function (text, modtime) {
-                                            FileUtils.writeText(apiNewFileEntry, text).done(function () {
-                                                var reportWin = window.open(jasmineHtmlEntry.fullPath);
-                                                reportWin.focus();
-                                            });
-                                        });
-                                    } else {
-                                        var reportWin = window.open(jasmineHtmlEntry.fullPath);
-                                        reportWin.focus();
-                                    }
-                                });
-                            });
-                        });
-                    });
-                });
-            });
-        });
+        jasmineRunner.run();
+       
     }
     
     // Run jasmine-node test, call to node server
@@ -220,7 +138,7 @@ define(function (require, exports, module) {
         nodeConnection.domains.jasmine.runTest(path)
             .fail(function (err) {
                 console.log("[brackets-jasmine] error running file: " + entry.fullPath + " message: " + err.toString());
-                var dlg = Dialogs.showModalDialog(
+                Dialogs.showModalDialog(
                     Dialogs.DIALOG_ID_ERROR,
                     "Jasmine Error",
                     "The test file contained an error: " + err.toString()
@@ -230,35 +148,9 @@ define(function (require, exports, module) {
 
     // Runs a QUnit test
     function runQUnit() {
-        var entry = ProjectManager.getSelectedItem();
-        if (entry === undefined) {
-            entry = DocumentManager.getCurrentDocument().file;
-        }
-        var dir = entry.fullPath.substring(0, entry.fullPath.lastIndexOf('/') + 1),
-            dirEntry = new NativeFileSystem.DirectoryEntry(dir),
-            fname = DocumentManager.getCurrentDocument().filename,
-            contents = DocumentManager.getCurrentDocument().getText(),
-            testName = entry.fullPath.substring(entry.fullPath.lastIndexOf("/") + 1),
-            testBase = testName.substring(0, testName.lastIndexOf('.')),
-            qunitReportEntry    = new NativeFileSystem.FileEntry(dir + testBase + '/qUnitReport.html'),
-            includes = parseIncludes(contents, dir);
-        var data = { filename : entry.name,
-                     title : 'QUnit test - ' + entry.name,
-                     includes : includes,
-                     templatedir : moduledir,
-                     contents : contents
-                   };
-        var template = require("text!templates/qunit.html");
-        var html = Mustache.render(template, data);
-        // write generated test report to file on disk
-        dirEntry.getDirectory(dir + testBase, {create: true}, function () {
-            FileUtils.writeText(qunitReportEntry, html).done(function () {
-                // launch new window with generated report
-                var report = window.open(qunitReportEntry.fullPath);
-                report.focus();
-            });
-        });
+        qunitRunner.run();
     }
+    
     // opens an html file in a new window
     function viewHtml() {
         var entry = ProjectManager.getSelectedItem();
@@ -311,11 +203,10 @@ define(function (require, exports, module) {
     //          params is an array of strings containing parameter names
     function parseCurrentDocument() {
         var text = DocumentManager.getCurrentDocument().getText();
-        var filename = DocumentManager.getCurrentDocument().file.name;
         var acorn = require('thirdparty/acorn/acorn_loose');
         var walk = require('thirdparty/acorn/walk');
         var ast = acorn.parse_dammit(text);
-        var i, j, functions = [], fparams, fname, fparamstr;
+        var i, functions = [], fparams;
         walk.simple(ast, {
             FunctionDeclaration: function (node) {
                 fparams = [];
@@ -330,11 +221,8 @@ define(function (require, exports, module) {
     // createNewFile: for generated tests created a new file in brackets
     // the file is added to the project (left panel)
     function createNewFile(fullpath, contents, testExt) {
-        function _getUntitledFileSuggestion(dir, baseFileName, fileExt, isFolder) {
+        function _getUntitledFileSuggestion(dirPath, baseFileName, fileExt, isFolder) {
             var result = new $.Deferred();
-            var suggestedName = baseFileName + fileExt;
-            var dirEntry = new NativeFileSystem.DirectoryEntry(dir);
-
             result.progress(function attemptNewName(suggestedName, nextIndexToUse) {
                 if (nextIndexToUse > 99) {
                     //we've tried this enough
@@ -342,29 +230,28 @@ define(function (require, exports, module) {
                     return;
                 }
 
+                
+                
                 //check this name
-                var successCallback = function (entry) {
-                    //file exists, notify to the next progress
-                    result.notify(baseFileName + "-" + nextIndexToUse + fileExt, nextIndexToUse + 1);
-                };
-                var errorCallback = function (error) {
-                    //most likely error is FNF, user is better equiped to handle the rest
-                    result.resolve(suggestedName);
+                var callback = function (error) {
+                    if (error) {
+                        //most likely error is FNF, user is better equiped to handle the rest
+                        result.resolve(suggestedName);
+                    } else {
+                        //file exists, notify to the next progress
+                        result.notify(baseFileName + "-" + nextIndexToUse + fileExt, nextIndexToUse + 1);
+                    }
                 };
             
                 if (isFolder) {
-                    dirEntry.getDirectory(
+                    FileSystem.resolve(
                         suggestedName,
-                        {},
-                        successCallback,
-                        errorCallback
+                        callback
                     );
                 } else {
-                    dirEntry.getFile(
+                    FileSystem.resolve(
                         suggestedName,
-                        {},
-                        successCallback,
-                        errorCallback
+                        callback
                     );
                 }
             });
@@ -419,7 +306,6 @@ define(function (require, exports, module) {
             filename = DocumentManager.getCurrentDocument().file.name,
             contents = DocumentManager.getCurrentDocument().getText(),
             userequire = contents.match(/define\w*\(/),
-            isnode = contents.match(/node\w*\:true/),
             i,
             j,
             fparamstr;
@@ -595,165 +481,13 @@ define(function (require, exports, module) {
         return result;
     }
 
-    // setup, connects to the node server loads node/JasmineDomain and node/ProcessDomain
-    AppInit.appReady(function () {
-        nodeConnection = new NodeConnection();
-        function connect() {
-            var connectionPromise = nodeConnection.connect(true);
-            connectionPromise.fail(function () {
-                console.error("[brackets-xunit] failed to connect to node");
-            });
-            return connectionPromise;
-        }
-
-        function loadJasmineDomain() {
-            var path = ExtensionUtils.getModulePath(module, "node/JasmineDomain");
-            var loadPromise = nodeConnection.loadDomains([path], true);
-            loadPromise.fail(function () {
-                console.log("[brackets-xunit] failed to load jasmine domain");
-            });
-            return loadPromise;
-        }
-
-        $(nodeConnection).on("jasmine.update", function (evt, jsondata) {
-            if (jsondata.length > 5 && jsondata.substring(0, 6) === 'Error:') {
-                var dlg = Dialogs.showModalDialog(
-                    Dialogs.DIALOG_ID_ERROR,
-                    "Jasmine Node Error",
-                    jsondata.substring(7)
-                );
-            } else {
-                FileUtils.readAsText(templateEntry).done(function (text, timestamp) {
-
-                    jsondata = jsondata.replace(/'/g, "");
-                    
-                    var jdata = JSON.parse(jsondata);
-                    var totaltime = 0;
-                    var i;
-                    for (i = 0; i < jdata.length; i++) {
-                        totaltime = totaltime + parseFloat(jdata[i].time);
-                    }
-                    var html = Mustache.render(text, {jsondata: jsondata, time: totaltime});
-                    FileUtils.writeText(reportJasNodeEntry, html).done(function () {
-                        window.open(reportJasNodeEntry.fullPath);
-                    });
-                });
-            }
-        });
-
-        function loadProcessDomain() {
-            var path = ExtensionUtils.getModulePath(module, "node/ProcessDomain");
-            var loadPromise = nodeConnection.loadDomains([path], true);
-            loadPromise.fail(function () {
-                console.log("[brackets-xunit] failed to load process domain");
-            });
-            return loadPromise;
-        }
-
-        function processOutput(pid, data) {
-            var status = '';
-            if (_windows[pid].done === false) {
-                if (data.indexOf("=== Summary ===") > -1) {
-                    _windows[pid].done = true;
-                }
-                var passes = data.match(/passed/g);
-                if (passes === null) {
-                    passes = 0;
-                } else {
-                    passes = passes.length;
-                }
-                _windows[pid].passes += passes;
-                if (passes > 0) {
-                    status += '<span style="color:green">' + _windows[pid].passes + ' passes</span>, ';
-                } else {
-                    status += _windows[pid].passes + " passes, ";
-                }
-                var failures = data.match(/failed in (non-)?strict mode ===<br>/g);
-                if (failures === null) {
-                    failures = 0;
-                } else {
-                    failures = failures.length;
-                }
-                _windows[pid].fails += failures;
-                if (_windows[pid].fails === 0) {
-                    status += "0 failures";
-                } else {
-                    status += ' <span style="color:red">' + _windows[pid].fails + ' failures</span>';
-                }
-                var expectedfailures = data.match(/failed in (non-)?strict mode as expected<br>/g);
-                if (expectedfailures === null) {
-                    expectedfailures = 0;
-                } else {
-                    expectedfailures = expectedfailures.length;
-                }
-                _windows[pid].expfails += expectedfailures;
-                if (_windows[pid].expfails > 0) {
-                    status += ", " + _windows[pid].expfails + " expected failures";
-                }
-                _windows[pid].window.document.getElementById("status" + pid).innerHTML = status;
-            }
-        }
-            
-        $(nodeConnection).on("process.stdout", function (event, result) {
-            var pid = result.pid,
-                data = result.data;
-            data = data.replace(/\r\n/g, '<br>').replace(/\n/g, '<br>');
-            if (_windows.hasOwnProperty(pid) === false) {
-                showError("Process Error", "there is no window with pid=" + pid);
-            } else {
-                var _window = _windows[pid].window,
-                    _time = _windows[pid].startTime,
-                    _type = _windows[pid].type,
-                    elapsed = new Date() - _time;
-                _window.document.getElementById("stdout-section").style.display = "block";
-                _window.document.getElementById("stdout").innerHTML += data;
-                _window.document.getElementById("time").innerHTML = formatTime(elapsed);
-            }
-        });
-                
-        $(nodeConnection).on("process.stderr", function (event, result) {
-            var pid = result.pid,
-                data = result.data;
-            data = data.replace(/\r\n/g, '<br>').replace(/\n/g, '<br>');
-            if (_windows.hasOwnProperty(pid) === false) {
-                showError("Process Error", "there is no window with pid=" + pid);
-            } else {
-                var _window = _windows[pid].window,
-                    _time = _windows[pid].startTime,
-                    _type = _windows[pid].type,
-                    elapsed = new Date() - _time;
-                _window.document.getElementById("stderr-section").style.display = "block";
-                _window.document.getElementById("stderr").innerHTML += data;
-                _window.document.getElementById("time").innerHTML = formatTime(elapsed);
-            }
-        });
-
-        $(nodeConnection).on("process.exit", function (event, result) {
-            var pid = result.pid,
-                data = result.data;
-            data = data.replace(/\n/g, '<br>');
-            if (_windows.hasOwnProperty(pid) === false) {
-                showError("Process Error", "there is no window with pid=" + pid);
-            } else {
-                var _window = _windows[pid].window,
-                    _time = _windows[pid].startTime,
-                    elapsed = new Date() - _time,
-                    code = result.exitcode;
-                _window.document.getElementById("stdout-section").style.display = "block";
-                _window.document.getElementById("stdout").innerHTML += data;
-                _window.document.getElementById("exitcode").innerHTML = "finished with exit code " + code;
-                _window.document.getElementById("time").innerHTML = formatTime(elapsed);
-            }
-        });
-        chain(connect, loadJasmineDomain, loadProcessDomain);
-    });
-
+    
     // reads config.js to determine if brackets-xunit should be disabled for the current project     
     function readConfig() {
         var result = new $.Deferred();
         var root = ProjectManager.getProjectRoot(),
-            configEntry = new NativeFileSystem.FileEntry(root.fullPath + "config.js");
-        FileUtils.readAsText(configEntry).done(function (text, timestamp) {
+            configFile = FileSystem.getFileForPath(root.fullPath + "config.js");
+        FileUtils.readAsText(configFile).done(function (text) {
             try {
                 var config = JSON.parse(text);
                 if (config.hasOwnProperty('brackets-xunit') && config['brackets-xunit'] === 'disable') {
@@ -764,12 +498,12 @@ define(function (require, exports, module) {
             } finally {
                 return result.resolve('ok');
             }
-        }).fail(function (error) {
+        }).fail(function () {
             return result.resolve('ok');
         });
         return result.promise();
     }
-
+    
     // determine if a file is a known test type
     // first look for brackets-xunit: [type], takes precedence
     // next look for distinguishing clues in the file:
@@ -845,6 +579,177 @@ define(function (require, exports, module) {
             menu.addMenuItem(GENERATE_YUI_CMD, "", Menus.LAST);
         }
     }
+    // setup, connects to the node server loads node/JasmineDomain and node/ProcessDomain
+    AppInit.appReady(function () {
+        
+         /*Globals for passing objects from run windows*/
+        window.reportComplete = function (result) {
+            if (result.status === "failed") {
+                MyStatusBar.statusFailed(result.message);
+                MyStatusBar.toggleCollapsed(false);
+            } else {
+                MyStatusBar.statusPassed(result.message);
+            }
+        };
+        
+        window.reportUpdate = function (result) {
+            console.log("update", result);
+            MyStatusBar.statusRunning(result.message);
+        };
+        
+        window.coverageComplete = function (result) {
+            MyStatusBar.statusCoverage(result.message);
+        };
+        
+        
+        function runTestsOnSaveOrChange(document) {
+                
+                
+            var language = document ? LanguageManager.getLanguageForPath(document.file.fullPath) : "";
+            if (language && language.getId() === "javascript") {
+                
+                var selectedEntry = document.file,
+                    text = document.getText(),
+                    type;
+                readConfig().done(function () {
+                    
+                    type = determineFileType(selectedEntry, text);
+                    if (type === "yui") {
+                        $("#status-language").text("Javascript+YUI");
+                        runYUI();
+                    } else if (type === "jasmine") {
+                        $("#status-language").text("Javascript+Jasmine");
+                        runJasmine();
+                    } else if (type === "qunit") {
+                        $("#status-language").text("Javascript+QUnit");
+                        runQUnit();
+                    }
+                    
+                });
+            }
+        }
+        
+        $(DocumentManager)
+            .on("documentSaved.xunit", function (e, d) {
+                runTestsOnSaveOrChange(d);
+            });
+       
+    
+        $(DocumentManager)
+            .on("currentDocumentChange", function () {
+                runTestsOnSaveOrChange(DocumentManager.getCurrentDocument());
+            });
+        
+        MyStatusBar.initializePanel();
+        
+        nodeConnection = new NodeConnection();
+        function connect() {
+            var connectionPromise = nodeConnection.connect(true);
+            connectionPromise.fail(function () {
+                console.error("[brackets-xunit] failed to connect to node");
+            });
+            return connectionPromise;
+        }
+
+        function loadJasmineDomain() {
+            var path = ExtensionUtils.getModulePath(module, "node/JasmineDomain");
+            var loadPromise = nodeConnection.loadDomains([path], true);
+            loadPromise.fail(function () {
+                console.log("[brackets-xunit] failed to load jasmine domain");
+            });
+            return loadPromise;
+        }
+
+        $(nodeConnection).on("jasmine.update", function (evt, jsondata) {
+            if (jsondata.length > 5 && jsondata.substring(0, 6) === 'Error:') {
+                Dialogs.showModalDialog(
+                    Dialogs.DIALOG_ID_ERROR,
+                    "Jasmine Node Error",
+                    jsondata.substring(7)
+                );
+            } else {
+                FileUtils.readAsText(templateFile).done(function (text) {
+
+                    jsondata = jsondata.replace(/'/g, "");
+                    
+                    var jdata = JSON.parse(jsondata);
+                    var totaltime = 0;
+                    var i;
+                    for (i = 0; i < jdata.length; i++) {
+                        totaltime = totaltime + parseFloat(jdata[i].time);
+                    }
+                    var html = Mustache.render(text, {jsondata: jsondata, time: totaltime});
+                    FileUtils.writeText(reportJasNodeFile, html).done(function () {
+                        window.open(reportJasNodeFile.fullPath);
+                    });
+                });
+            }
+        });
+
+        function loadProcessDomain() {
+            var path = ExtensionUtils.getModulePath(module, "node/ProcessDomain");
+            var loadPromise = nodeConnection.loadDomains([path], true);
+            loadPromise.fail(function () {
+                console.log("[brackets-xunit] failed to load process domain");
+            });
+            return loadPromise;
+        }
+
+            
+        $(nodeConnection).on("process.stdout", function (event, result) {
+            var pid = result.pid,
+                data = result.data;
+            data = data.replace(/\r\n/g, '<br>').replace(/\n/g, '<br>');
+            if (_windows.hasOwnProperty(pid) === false) {
+                showError("Process Error", "there is no window with pid=" + pid);
+            } else {
+                var _window = _windows[pid].window,
+                    _time = _windows[pid].startTime,
+                    elapsed = new Date() - _time;
+                _window.document.getElementById("stdout-section").style.display = "block";
+                _window.document.getElementById("stdout").innerHTML += data;
+                _window.document.getElementById("time").innerHTML = formatTime(elapsed);
+            }
+        });
+                
+        $(nodeConnection).on("process.stderr", function (event, result) {
+            var pid = result.pid,
+                data = result.data;
+            data = data.replace(/\r\n/g, '<br>').replace(/\n/g, '<br>');
+            if (_windows.hasOwnProperty(pid) === false) {
+                showError("Process Error", "there is no window with pid=" + pid);
+            } else {
+                var _window = _windows[pid].window,
+                    _time = _windows[pid].startTime,
+                    elapsed = new Date() - _time;
+                _window.document.getElementById("stderr-section").style.display = "block";
+                _window.document.getElementById("stderr").innerHTML += data;
+                _window.document.getElementById("time").innerHTML = formatTime(elapsed);
+            }
+        });
+
+        $(nodeConnection).on("process.exit", function (event, result) {
+            var pid = result.pid,
+                data = result.data;
+            data = data.replace(/\n/g, '<br>');
+            if (_windows.hasOwnProperty(pid) === false) {
+                showError("Process Error", "there is no window with pid=" + pid);
+            } else {
+                var _window = _windows[pid].window,
+                    _time = _windows[pid].startTime,
+                    elapsed = new Date() - _time,
+                    code = result.exitcode;
+                _window.document.getElementById("stdout-section").style.display = "block";
+                _window.document.getElementById("stdout").innerHTML += data;
+                _window.document.getElementById("exitcode").innerHTML = "finished with exit code " + code;
+                _window.document.getElementById("time").innerHTML = formatTime(elapsed);
+            }
+        });
+        chain(connect, loadJasmineDomain, loadProcessDomain);
+    });
+
+   
+
 
     // Register commands as right click menu items
     commands = [ YUITEST_CMD, JASMINETEST_CMD, QUNITTEST_CMD, SCRIPT_CMD, NODETEST_CMD, GENERATE_JASMINE_CMD,
@@ -860,7 +765,7 @@ define(function (require, exports, module) {
     CommandManager.register("xUnit View html", VIEWHTML_CMD, viewHtml);
 
     // check if the extension should add a menu item to the project menu (under the project name, left panel)
-    $(projectMenu).on("beforeContextMenuOpen", function (evt) {
+    $(projectMenu).on("beforeContextMenuOpen", function () {
         var selectedEntry = ProjectManager.getSelectedItem(),
             text = '';
         if (selectedEntry && selectedEntry.fullPath && DocumentManager.getCurrentDocument() !== null && selectedEntry.fullPath === DocumentManager.getCurrentDocument().file.fullPath) {
@@ -871,8 +776,9 @@ define(function (require, exports, module) {
             checkFileTypes(projectMenu, selectedEntry, text);
         });
     });
+    
     // check if the extension should add a menu item to the workingset menu (under Working Files, left panel)
-    $(workingsetMenu).on("beforeContextMenuOpen", function (evt) {
+    $(workingsetMenu).on("beforeContextMenuOpen", function () {
         var selectedEntry = DocumentManager.getCurrentDocument().file,
             text = DocumentManager.getCurrentDocument().getText();
         cleanMenu(workingsetMenu);
@@ -885,3 +791,7 @@ define(function (require, exports, module) {
     exports.determineFileType = determineFileType;
     exports.parseIncludes = parseIncludes;
 });
+
+
+
+

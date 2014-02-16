@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>YUI Test - {{filename}}</title>
+        <script src="yui.js"></script>
+        {{{includes}}}
+    </head>
+    <body>
+        <script>
+var myParent = window.parent;
+YUI({ logInclude: {TestRunner: true }}).use('test', 'test-console', function (Y) {
+    var testRunner = Y.Test.Runner;
+    testRunner.subscribe(testRunner.COMPLETE_EVENT, function(e) { 
+    console.log(e);
+    var result = {}
+        if(e.results.passed === e.results.total) {
+            result.status = "passed";
+            result.message = "Success! " + e.results.passed + " passed";
+        } else {
+            result.status = "failed";
+            result.message = e.results.failed + " failures";
+        }
+    
+        if(myParent.reportComplete) {
+            console.log("myParent.reportComplete", result);
+            myParent.reportComplete(result);
+        }
+        
+        var totals = document.querySelectorAll(".grand-total .rs");
+        if(myParent.coverageComplete) {
+            myParent.coverageComplete({
+                message: totals && totals[0] ? totals[0].innerHTML + " coverage" : "No coverage"
+            });
+        }
+    });
+});
+            {{{contents}}}
+            
+
+            
+
+        </script>
+    </body>
+</html>
